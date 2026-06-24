@@ -69,6 +69,16 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
           const name = row[nameIndex]?.trim();
           let matricula = row[matriculaIndex]?.trim();
 
+          // Fallback: if matricula is empty or we didn't find a good column, look for the first 7-15 digit number
+          if (!matricula || !/^[0-9]+$/.test(matricula)) {
+            for (let j = 1; j < row.length; j++) {
+              if (row[j] && /^[0-9]{7,15}$/.test(row[j].trim())) {
+                matricula = row[j].trim();
+                break;
+              }
+            }
+          }
+
           if (name) {
             if (!matricula) {
               matricula = "TEMP_" + Math.floor(1000 + Math.random() * 9000);

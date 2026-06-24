@@ -8,7 +8,10 @@ import { useDocenteStore } from "../store/docenteStore";
 import StudentImporter from "./StudentImporter";
 import CategoryManager from "./CategoryManager";
 import GradesTable from "./GradesTable";
-import { ArrowLeft, Users, Settings, Plus, Trash2, Edit, Save, BookOpen, Key, AlertCircle, FileSpreadsheet, Percent } from "lucide-react";
+import AttendanceManager from "./AttendanceManager";
+import ActivitiesManager from "./ActivitiesManager";
+import TeamsManager from "./TeamsManager";
+import { ArrowLeft, Users, Settings, Plus, Trash2, Edit, Save, BookOpen, Key, AlertCircle, FileSpreadsheet, Percent, CalendarCheck, ClipboardList, Group as GroupIcon } from "lucide-react";
 
 interface GroupDetailsProps {
   groupId: string;
@@ -35,12 +38,13 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
   const updateGroup = useDocenteStore((state) => state.updateGroup);
   const deleteGroup = useDocenteStore((state) => state.deleteGroup);
 
-  const [activeTab, setActiveTab] = useState<"students" | "categories" | "grades">("students");
+  const [activeTab, setActiveTab] = useState<"students" | "categories" | "grades" | "attendance" | "activities" | "teams">("students");
 
   // Group settings edit state
   const [isEditingGroup, setIsEditingGroup] = useState(false);
   const [editGroupName, setEditGroupName] = useState(group?.name || "");
   const [editGroupYear, setEditGroupYear] = useState(group?.schoolYear || "");
+  const [editGroupReqAttendance, setEditGroupReqAttendance] = useState(group?.requiredAttendancePercentage || 80);
   const [groupError, setGroupError] = useState<string | null>(null);
 
   // Manual student add state
@@ -74,7 +78,7 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
       return;
     }
     try {
-      await updateGroup(groupId, editGroupName.trim(), editGroupYear.trim());
+      await updateGroup(groupId, editGroupName.trim(), editGroupYear.trim(), editGroupReqAttendance);
       setIsEditingGroup(false);
     } catch (e) {
       setGroupError("Error al actualizar los datos.");
@@ -251,31 +255,61 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
       </div>
 
       {/* Secondary Level Tab Bar */}
-      <div className="flex border-b border-slate-100 bg-white rounded-xl p-1 shadow-sm max-w-lg">
+      <div className="flex flex-wrap border-b border-slate-100 bg-white rounded-xl p-1 shadow-sm gap-1">
         <button
           id="subtab-students"
           onClick={() => setActiveTab("students")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
             activeTab === "students" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Users className="w-4 h-4" />
-          Alumnos ({students.length})
+          Alumnos
+        </button>
+        <button
+          id="subtab-attendance"
+          onClick={() => setActiveTab("attendance")}
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "attendance" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <CalendarCheck className="w-4 h-4" />
+          Asistencia
+        </button>
+        <button
+          id="subtab-teams"
+          onClick={() => setActiveTab("teams")}
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "teams" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <GroupIcon className="w-4 h-4" />
+          Equipos
         </button>
         <button
           id="subtab-categories"
           onClick={() => setActiveTab("categories")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
             activeTab === "categories" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Percent className="w-4 h-4" />
-          Categorías ({categories.length})
+          Rúbrica
+        </button>
+        <button
+          id="subtab-activities"
+          onClick={() => setActiveTab("activities")}
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "activities" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          Actividades
         </button>
         <button
           id="subtab-grades"
           onClick={() => setActiveTab("grades")}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
             activeTab === "grades" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
           }`}
         >
@@ -409,6 +443,15 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
 
         {/* TAB 3: GRADES CONTROL PANELS */}
         {activeTab === "grades" && <GradesTable groupId={groupId} />}
+
+        {/* TAB 4: ATTENDANCE */}
+        {activeTab === "attendance" && <AttendanceManager groupId={groupId} />}
+
+        {/* TAB 5: ACTIVITIES */}
+        {activeTab === "activities" && <ActivitiesManager groupId={groupId} />}
+
+        {/* TAB 6: TEAMS */}
+        {activeTab === "teams" && <TeamsManager groupId={groupId} />}
       </div>
     </div>
   );

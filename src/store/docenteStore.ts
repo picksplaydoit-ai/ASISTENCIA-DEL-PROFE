@@ -4,7 +4,7 @@
  */
 
 import { create } from "zustand";
-import { Teacher, Group, Student, Category, Grade } from "../types";
+import { Teacher, Group, Student, Category, Grade, Activity, Attendance, Team } from "../types";
 import { db, auth, isLocalStorageFallback } from "../lib/firebase";
 import {
   collection,
@@ -41,12 +41,16 @@ interface DocenteState {
   students: Student[];
   categories: Category[];
   grades: Grade[];
+  activities: Activity[];
+  attendances: Attendance[];
+  teams: Team[];
 
   // Active student session (portal)
   activeStudent: Student | null;
   activeStudentGroup: Group | null;
   activeStudentCategories: Category[];
   activeStudentGrades: Grade[];
+  activeStudentActivities: Activity[];
 
   // Database mode info
   isFirebaseMode: boolean;
@@ -68,11 +72,12 @@ interface DocenteState {
 
   // Group CRUD
   createGroup: (name: string, schoolYear: string) => Promise<void>;
-  updateGroup: (groupId: string, name: string, schoolYear: string) => Promise<void>;
+  updateGroup: (groupId: string, name: string, schoolYear: string, requiredAttendancePercentage?: number) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
 
   // Student CRUD & Import
   importStudents: (groupId: string, studentsToImport: { name: string; matricula: string }[]) => Promise<Student[]>;
+  updateStudentOverride: (studentId: string, manualFinalGrade: number | null, manualStatus: "Aprobado" | "Reprobado" | "SD" | null) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
 
   // Category CRUD
@@ -80,8 +85,21 @@ interface DocenteState {
   updateCategory: (categoryId: string, name: string, percentage: number) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
 
+  // Activity CRUD
+  createActivity: (groupId: string, categoryId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
+  updateActivity: (activityId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
+  deleteActivity: (activityId: string) => Promise<void>;
+
+  // Team CRUD
+  createTeam: (groupId: string, name: string, studentIds: string[]) => Promise<void>;
+  updateTeam: (teamId: string, name: string, studentIds: string[]) => Promise<void>;
+  deleteTeam: (teamId: string) => Promise<void>;
+
+  // Attendance CRUD
+  markAttendance: (groupId: string, date: string, records: Record<string, boolean>) => Promise<void>;
+
   // Grade CRUD
-  saveGrade: (studentId: string, categoryId: string, activityName: string, score: number) => Promise<void>;
+  saveGrade: (studentId: string, categoryId: string, activityName: string, score: number, activityId?: string, delivered?: boolean, deliveredWorks?: number) => Promise<void>;
   deleteGrade: (gradeId: string) => Promise<void>;
 
   // Student Portal Actions
@@ -162,11 +180,15 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   students: [],
   categories: [],
   grades: [],
+  activities: [],
+  attendances: [],
+  teams: [],
 
   activeStudent: null,
   activeStudentGroup: null,
   activeStudentCategories: [],
   activeStudentGrades: [],
+  activeStudentActivities: [],
 
   isFirebaseMode: !isLocalStorageFallback,
 
@@ -252,23 +274,32 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     const localStudents = localStorage.getItem(`docente_students_${teacherId}`) || "[]";
     const localCategories = localStorage.getItem(`docente_categories_${teacherId}`) || "[]";
     const localGrades = localStorage.getItem(`docente_grades_${teacherId}`) || "[]";
+    const localActivities = localStorage.getItem(`docente_activities_${teacherId}`) || "[]";
+    const localAttendances = localStorage.getItem(`docente_attendances_${teacherId}`) || "[]";
+    const localTeams = localStorage.getItem(`docente_teams_${teacherId}`) || "[]";
 
     set({
       groups: JSON.parse(localGroups),
       students: JSON.parse(localStudents),
       categories: JSON.parse(localCategories),
       grades: JSON.parse(localGrades),
+      activities: JSON.parse(localActivities),
+      attendances: JSON.parse(localAttendances),
+      teams: JSON.parse(localTeams),
     });
   },
 
   saveLocalData: () => {
     const teacher = get().currentTeacher;
     if (!teacher) return;
-    const { groups, students, categories, grades } = get();
+    const { groups, students, categories, grades, activities, attendances, teams } = get();
     localStorage.setItem(`docente_groups_${teacher.uid}`, JSON.stringify(groups));
     localStorage.setItem(`docente_students_${teacher.uid}`, JSON.stringify(students));
     localStorage.setItem(`docente_categories_${teacher.uid}`, JSON.stringify(categories));
     localStorage.setItem(`docente_grades_${teacher.uid}`, JSON.stringify(grades));
+    localStorage.setItem(`docente_activities_${teacher.uid}`, JSON.stringify(activities));
+    localStorage.setItem(`docente_attendances_${teacher.uid}`, JSON.stringify(attendances));
+    localStorage.setItem(`docente_teams_${teacher.uid}`, JSON.stringify(teams));
   },
 
   // Real-time Firestore subscriptions for Teacher
@@ -557,18 +588,29 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     }
   },
 
-  updateGroup: async (groupId, name, schoolYear) => {
+  updateGroup: async (groupId, name, schoolYear, requiredAttendancePercentage) => {
     if (!isLocalStorageFallback && db) {
       try {
-        await setDoc(doc(db, "groups", groupId), { name, schoolYear }, { merge: true });
+        const updateData: any = { name, schoolYear };
+        if (requiredAttendancePercentage !== undefined) {
+          updateData.requiredAttendancePercentage = requiredAttendancePercentage;
+        }
+        await setDoc(doc(db, "groups", groupId), updateData, { merge: true });
       } catch (e) {
         console.error("Error updating group in Firestore:", e);
       }
     } else {
       set((state) => {
-        const updated = state.groups.map((g) =>
-          g.id === groupId ? { ...g, name, schoolYear } : g
-        );
+        const updated = state.groups.map((g) => {
+          if (g.id === groupId) {
+            const up: Group = { ...g, name, schoolYear };
+            if (requiredAttendancePercentage !== undefined) {
+              up.requiredAttendancePercentage = requiredAttendancePercentage;
+            }
+            return up;
+          }
+          return g;
+        });
         setTimeout(() => get().saveLocalData(), 0);
         return { groups: updated };
       });
@@ -665,6 +707,21 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     }
 
     return importedList;
+  },
+
+  updateStudentOverride: async (studentId, manualFinalGrade, manualStatus) => {
+    if (!isLocalStorageFallback && db) {
+      try {
+        await setDoc(doc(db, "students", studentId), { manualFinalGrade, manualStatus }, { merge: true });
+      } catch (e) {
+        console.error("Error updating student override:", e);
+      }
+    } else {
+      set((state) => ({
+        students: state.students.map((s) => (s.id === studentId ? { ...s, manualFinalGrade, manualStatus } : s)),
+      }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
   },
 
   deleteStudent: async (studentId) => {
@@ -767,12 +824,13 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   // GRADE CRUD
-  saveGrade: async (studentId, categoryId, activityName, score) => {
-    // Generate an ID based on student, category and activityName to make it unique or overwrite
-    // Under the requested flow, "Capturar calificaciones" usually overwrites if we select the exact same activity, or we can add a new record.
-    // Let's check if there is an existing grade for this student, category, and activity. If so, overwrite. Otherwise add.
+  saveGrade: async (studentId, categoryId, activityName, score, activityId, delivered, deliveredWorks) => {
+    // Generate an ID based on student, category and activityName (or activityId) to make it unique or overwrite
     const existingGrade = get().grades.find(
-      (g) => g.studentId === studentId && g.categoryId === categoryId && g.activityName.trim().toLowerCase() === activityName.trim().toLowerCase()
+      (g) => g.studentId === studentId && (
+        (activityId && g.activityId === activityId) || 
+        (!activityId && g.categoryId === categoryId && (g.activityName || "").trim().toLowerCase() === activityName.trim().toLowerCase())
+      )
     );
 
     const gradeId = existingGrade ? existingGrade.id : generateUUID();
@@ -782,6 +840,9 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       categoryId,
       activityName: activityName.trim(),
       grade: score,
+      activityId,
+      delivered,
+      deliveredWorks,
       date: new Date().toLocaleDateString("es-MX") || new Date().toISOString().split("T")[0],
     };
 
@@ -818,6 +879,100 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         setTimeout(() => get().saveLocalData(), 0);
         return { grades: updated };
       });
+    }
+  },
+
+  // ACTIVITY CRUD
+  createActivity: async (groupId, categoryId, name, type, totalWorks, isTeamActivity, date) => {
+    const newActivity: Activity = {
+      id: generateUUID(),
+      groupId,
+      categoryId,
+      name,
+      type,
+      totalWorks,
+      isTeamActivity,
+      date,
+    };
+    if (!isLocalStorageFallback && db) {
+      await setDoc(doc(db, "activities", newActivity.id), newActivity);
+    } else {
+      set((state) => ({ activities: [...state.activities, newActivity] }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+  updateActivity: async (activityId, name, type, totalWorks, isTeamActivity, date) => {
+    if (!isLocalStorageFallback && db) {
+      await setDoc(doc(db, "activities", activityId), { name, type, totalWorks, isTeamActivity, date }, { merge: true });
+    } else {
+      set((state) => ({
+        activities: state.activities.map((a) => (a.id === activityId ? { ...a, name, type, totalWorks, isTeamActivity, date } : a)),
+      }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+  deleteActivity: async (activityId) => {
+    if (!isLocalStorageFallback && db) {
+      await deleteDoc(doc(db, "activities", activityId));
+      // Optionally delete related grades here in Firestore
+    } else {
+      set((state) => ({ 
+        activities: state.activities.filter((a) => a.id !== activityId),
+        grades: state.grades.filter((g) => g.activityId !== activityId)
+      }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+
+  // TEAM CRUD
+  createTeam: async (groupId, name, studentIds) => {
+    const newTeam: Team = { id: generateUUID(), groupId, name, studentIds };
+    if (!isLocalStorageFallback && db) {
+      await setDoc(doc(db, "teams", newTeam.id), newTeam);
+    } else {
+      set((state) => ({ teams: [...state.teams, newTeam] }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+  updateTeam: async (teamId, name, studentIds) => {
+    if (!isLocalStorageFallback && db) {
+      await setDoc(doc(db, "teams", teamId), { name, studentIds }, { merge: true });
+    } else {
+      set((state) => ({
+        teams: state.teams.map((t) => (t.id === teamId ? { ...t, name, studentIds } : t)),
+      }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+  deleteTeam: async (teamId) => {
+    if (!isLocalStorageFallback && db) {
+      await deleteDoc(doc(db, "teams", teamId));
+    } else {
+      set((state) => ({ teams: state.teams.filter((t) => t.id !== teamId) }));
+      setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+
+  // ATTENDANCE CRUD
+  markAttendance: async (groupId, date, records) => {
+    const existing = get().attendances.find((a) => a.groupId === groupId && a.date === date);
+    if (existing) {
+      if (!isLocalStorageFallback && db) {
+        await setDoc(doc(db, "attendances", existing.id), { records }, { merge: true });
+      } else {
+        set((state) => ({
+          attendances: state.attendances.map((a) => (a.id === existing.id ? { ...a, records } : a)),
+        }));
+        setTimeout(() => get().saveLocalData(), 0);
+      }
+    } else {
+      const newAttendance: Attendance = { id: generateUUID(), groupId, date, records };
+      if (!isLocalStorageFallback && db) {
+        await setDoc(doc(db, "attendances", newAttendance.id), newAttendance);
+      } else {
+        set((state) => ({ attendances: [...state.attendances, newAttendance] }));
+        setTimeout(() => get().saveLocalData(), 0);
+      }
     }
   },
 

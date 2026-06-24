@@ -17,9 +17,12 @@ export default function CategoryManager({ groupId }: CategoryManagerProps) {
     allCategories.filter((c) => c.groupId === groupId),
     [allCategories, groupId]
   );
+  const groups = useDocenteStore((state) => state.groups);
+  const group = groups.find(g => g.id === groupId);
   const createCategory = useDocenteStore((state) => state.createCategory);
   const updateCategory = useDocenteStore((state) => state.updateCategory);
   const deleteCategory = useDocenteStore((state) => state.deleteCategory);
+  const updateGroup = useDocenteStore((state) => state.updateGroup);
 
   const [newCatName, setNewCatName] = useState("");
   const [newCatPercentage, setNewCatPercentage] = useState("");
@@ -27,8 +30,19 @@ export default function CategoryManager({ groupId }: CategoryManagerProps) {
   const [editName, setEditName] = useState("");
   const [editPercentage, setEditPercentage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  
+  const [attendancePercentage, setAttendancePercentage] = useState(group?.requiredAttendancePercentage || 80);
+  const [attendanceSaved, setAttendanceSaved] = useState(false);
 
   const totalPercentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
+
+  const saveAttendanceSetting = async () => {
+    if (group) {
+      await updateGroup(groupId, group.name, group.schoolYear, attendancePercentage);
+      setAttendanceSaved(true);
+      setTimeout(() => setAttendanceSaved(false), 2000);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,6 +298,39 @@ export default function CategoryManager({ groupId }: CategoryManagerProps) {
           </div>
         </form>
       )}
+
+      {/* Attendance Settings Form */}
+      <div className="border-t border-slate-100 pt-5 mt-4">
+        <h4 className="text-xs font-semibold text-slate-700 mb-3">Asistencia (Derecho a Evaluación)</h4>
+        <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 gap-4">
+          <div className="flex-1">
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Asistencia Mínima Requerida (%)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={attendancePercentage}
+                onChange={(e) => setAttendancePercentage(parseInt(e.target.value) || 0)}
+                className="w-20 text-xs border border-slate-200 rounded px-2 py-1.5 text-center font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <span className="text-xs font-medium text-slate-500">%</span>
+            </div>
+          </div>
+          <button
+            onClick={saveAttendanceSetting}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition shrink-0 ${
+              attendanceSaved 
+                ? "bg-emerald-100 text-emerald-700" 
+                : "bg-slate-200 hover:bg-slate-300 text-slate-700"
+            }`}
+          >
+            {attendanceSaved ? "Guardado" : "Guardar Asistencia"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

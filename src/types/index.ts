@@ -15,6 +15,7 @@ export interface Group {
   name: string;
   schoolYear: string;
   createdAt: string;
+  requiredAttendancePercentage?: number;
 }
 
 export interface Student {
@@ -25,6 +26,15 @@ export interface Student {
   accessCode: string;
   active: boolean;
   createdAt: string;
+  manualFinalGrade?: number | null;
+  manualStatus?: "Aprobado" | "Reprobado" | "SD" | null;
+}
+
+export interface Team {
+  id: string;
+  groupId: string;
+  name: string;
+  studentIds: string[];
 }
 
 export interface Category {
@@ -34,11 +44,34 @@ export interface Category {
   percentage: number; // e.g. 30 for 30%
 }
 
+export type ActivityType = "numeric" | "boolean" | "total";
+
+export interface Activity {
+  id: string;
+  groupId: string;
+  categoryId: string;
+  name: string;
+  type: ActivityType;
+  totalWorks?: number;
+  isTeamActivity: boolean;
+  date: string;
+}
+
 export interface Grade {
   id: string;
   studentId: string;
   categoryId: string;
-  activityName: string;
-  grade: number; // 0 to 100
+  activityId?: string; // Optional for backward compatibility with old grades
+  activityName?: string; // Optional for backward compatibility
+  grade?: number; // Numeric grade 0-100
+  delivered?: boolean; // For type 'boolean'
+  deliveredWorks?: number; // For type 'total'
   date: string;
+}
+
+export interface Attendance {
+  id: string;
+  groupId: string;
+  date: string;
+  records: Record<string, boolean>; // studentId -> true if present, false if absent
 }
