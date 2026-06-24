@@ -51,9 +51,6 @@ interface DocenteState {
   // Database mode info
   isFirebaseMode: boolean;
 
-  // Unsubscribe cleanups
-  unsubscribers: (() => void)[];
-
   // Actions
   initialize: () => void;
   setView: (view: DocenteState["currentView"]) => void;
@@ -108,6 +105,46 @@ export function generateUUID(): string {
   return "std_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now().toString(36);
 }
 
+// Active Firestore listener unsubscribe references
+let authUnsubscribe: (() => void) | null = null;
+let groupsUnsubscribe: (() => void) | null = null;
+let studentsUnsubscribe: (() => void) | null = null;
+let categoriesUnsubscribe: (() => void) | null = null;
+let gradesUnsubscribe: (() => void) | null = null;
+let studentPortalUnsubscribers: (() => void)[] = [];
+let lastSubscribedGroupIds: string[] = [];
+
+const arraysAreEqual = (a: string[], b: string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((val, index) => val === sortedB[index]);
+};
+
+const clearTeacherSubscriptions = () => {
+  if (groupsUnsubscribe) {
+    groupsUnsubscribe();
+    groupsUnsubscribe = null;
+  }
+  if (studentsUnsubscribe) {
+    studentsUnsubscribe();
+    studentsUnsubscribe = null;
+  }
+  if (categoriesUnsubscribe) {
+    categoriesUnsubscribe();
+    categoriesUnsubscribe = null;
+  }
+  if (gradesUnsubscribe) {
+    gradesUnsubscribe();
+    gradesUnsubscribe = null;
+  }
+};
+
+const clearStudentPortalSubscriptions = () => {
+  studentPortalUnsubscribers.forEach((unsub) => unsub());
+  studentPortalUnsubscribers = [];
+};
+
 export const useDocenteStore = create<DocenteState>((set, get) => ({
   currentTeacher: null,
   isAuthenticated: false,
@@ -128,11 +165,13 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   activeStudentGrades: [],
 
   isFirebaseMode: !isLocalStorageFallback,
-  unsubscribers: [],
 
   initialize: () => {
     // Listen to Firebase Auth state if configured
     if (!isLocalStorageFallback && auth) {
+      if (authUnsubscribe) {
+        authUnsubscribe();
+      }
       const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
           try {
@@ -176,7 +215,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
           });
         }
       });
-      set((state) => ({ unsubscribers: [...state.unsubscribers, unsub] }));
+      authUnsubscribe = unsub;
     } else {
       // Local storage fallback initialization
       const localTeacher = localStorage.getItem("docente_current_teacher");
@@ -233,13 +272,13 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     if (isLocalStorageFallback || !db) return;
 
     // Clear existing subs
-    get().unsubscribers.forEach((unsub) => unsub());
-    set({ unsubscribers: [] });
+    clearTeacherSubscriptions();
+    lastSubscribedGroupIds = [];
 
     try {
       // 1. Subscribe to Groups
       const groupsQuery = query(collection(db, "groups"), where("teacherId", "==", teacherId));
-      const unsubGroups = onSnapshot(groupsQuery, (snapshot) => {
+      groupsUnsubscribe = onSnapshot(groupsQuery, (snapshot) => {
         const groupsList: Group[] = [];
         snapshot.forEach((d) => {
           groupsList.push({ id: d.id, ...d.data() } as Group);
@@ -252,12 +291,14 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
           get().subscribeToGroupsSubData(groupIds);
         } else {
           set({ students: [], categories: [], grades: [] });
+          if (studentsUnsubscribe) { studentsUnsubscribe(); studentsUnsubscribe = null; }
+          if (categoriesUnsubscribe) { categoriesUnsubscribe(); categoriesUnsubscribe = null; }
+          if (gradesUnsubscribe) { gradesUnsubscribe(); gradesUnsubscribe = null; }
+          lastSubscribedGroupIds = [];
         }
       }, (error) => {
         console.error("Error subscribing to groups:", error);
       });
-
-      set((state) => ({ unsubscribers: [...state.unsubscribers, unsubGroups] }));
     } catch (err) {
       console.error("Failed to setup subscriptions:", err);
     }
@@ -266,12 +307,32 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   subscribeToGroupsSubData: (groupIds: string[]) => {
     if (isLocalStorageFallback || !db) return;
 
+    // Avoid redundant calls and infinite loop updates
+    if (arraysAreEqual(lastSubscribedGroupIds, groupIds)) {
+      return;
+    }
+
+    // Clean up previous sub-data listeners first
+    if (studentsUnsubscribe) {
+      studentsUnsubscribe();
+      studentsUnsubscribe = null;
+    }
+    if (categoriesUnsubscribe) {
+      categoriesUnsubscribe();
+      categoriesUnsubscribe = null;
+    }
+    if (gradesUnsubscribe) {
+      gradesUnsubscribe();
+      gradesUnsubscribe = null;
+    }
+
+    lastSubscribedGroupIds = [...groupIds];
+
     try {
       // We do real-time onSnapshot for students, categories, and grades
-      // Since Firestore 'in' query supports up to 30 items, if groupIds length is larger we split, but for a simple system, it's typically fine.
       // 2. Subscribe to Students
       const studentsQuery = query(collection(db, "students"), where("groupId", "in", groupIds));
-      const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
+      studentsUnsubscribe = onSnapshot(studentsQuery, (snapshot) => {
         const studentsList: Student[] = [];
         snapshot.forEach((d) => {
           studentsList.push({ id: d.id, ...d.data() } as Student);
@@ -283,7 +344,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
       // 3. Subscribe to Categories
       const categoriesQuery = query(collection(db, "categories"), where("groupId", "in", groupIds));
-      const unsubCategories = onSnapshot(categoriesQuery, (snapshot) => {
+      categoriesUnsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
         const categoriesList: Category[] = [];
         snapshot.forEach((d) => {
           categoriesList.push({ id: d.id, ...d.data() } as Category);
@@ -294,24 +355,16 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       });
 
       // 4. Subscribe to Grades
-      // Grades might be large, but they are linked to students. We fetch all grades for these students
-      // Let's get student IDs to be sure or simply load from a grades collection.
-      // A clean way is loading the grades collection that belongs to these students, or simply listen to all grades if schema permits.
-      // Let's query all grades. (Since Firebase rules let authenticated teacher read all grades, we query directly)
-      const unsubGrades = onSnapshot(collection(db, "grades"), (snapshot) => {
+      // Let's query all grades.
+      gradesUnsubscribe = onSnapshot(collection(db, "grades"), (snapshot) => {
         const gradesList: Grade[] = [];
         snapshot.forEach((d) => {
           gradesList.push({ id: d.id, ...d.data() } as Grade);
         });
-        // We filter locally or in query. To be clean, we can store all of them or filter by students we own.
         set({ grades: gradesList });
       }, (error) => {
         console.error("Error subscribing to grades:", error);
       });
-
-      set((state) => ({
-        unsubscribers: [...state.unsubscribers, unsubStudents, unsubCategories, unsubGrades]
-      }));
     } catch (e) {
       console.error("Error subscribing to group subdata:", e);
     }
@@ -445,8 +498,8 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
   logoutTeacher: async () => {
     // Unsubscribe all
-    get().unsubscribers.forEach((unsub) => unsub());
-    set({ unsubscribers: [] });
+    clearTeacherSubscriptions();
+    lastSubscribedGroupIds = [];
 
     if (!isLocalStorageFallback && auth) {
       await firebaseSignOut(auth);
@@ -839,14 +892,14 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   logoutStudent: () => {
-    get().unsubscribers.forEach((unsub) => unsub());
-    set((state) => ({
+    clearStudentPortalSubscriptions();
+    set({
       activeStudent: null,
       activeStudentGroup: null,
       activeStudentCategories: [],
       activeStudentGrades: [],
       currentView: "landing",
-    }));
+    });
   },
 
   // Subscribe to updates for student
@@ -854,8 +907,9 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     if (isLocalStorageFallback || !db) return;
 
     // Clear existing student listeners
-    get().unsubscribers.forEach((unsub) => unsub());
-    set({ unsubscribers: [] });
+    clearStudentPortalSubscriptions();
+    clearTeacherSubscriptions(); // Clear teacher subscriptions just in case
+    lastSubscribedGroupIds = [];
 
     try {
       // 1. Subscribe to Categories for student's group
@@ -878,9 +932,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         set({ activeStudentGrades: gradesList });
       });
 
-      set((state) => ({
-        unsubscribers: [...state.unsubscribers, unsubCats, unsubGrades]
-      }));
+      studentPortalUnsubscribers.push(unsubCats, unsubGrades);
     } catch (e) {
       console.error("Error subscribing to student portal data:", e);
     }
