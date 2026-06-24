@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 import { Teacher, Group, Student, Category, Grade } from "../types";
-import { db, auth, isFirebaseConfigured } from "../lib/firebase";
+import { db, auth, isLocalStorageFallback } from "../lib/firebase";
 import {
   collection,
   doc,
@@ -127,12 +127,12 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   activeStudentCategories: [],
   activeStudentGrades: [],
 
-  isFirebaseMode: !!isFirebaseConfigured,
+  isFirebaseMode: !isLocalStorageFallback,
   unsubscribers: [],
 
   initialize: () => {
     // Listen to Firebase Auth state if configured
-    if (isFirebaseConfigured && auth) {
+    if (!isLocalStorageFallback && auth) {
       const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
           try {
@@ -230,7 +230,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
   // Real-time Firestore subscriptions for Teacher
   subscribeToTeacherData: (teacherId: string) => {
-    if (!isFirebaseConfigured || !db) return;
+    if (isLocalStorageFallback || !db) return;
 
     // Clear existing subs
     get().unsubscribers.forEach((unsub) => unsub());
@@ -264,7 +264,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   subscribeToGroupsSubData: (groupIds: string[]) => {
-    if (!isFirebaseConfigured || !db) return;
+    if (isLocalStorageFallback || !db) return;
 
     try {
       // We do real-time onSnapshot for students, categories, and grades
@@ -321,7 +321,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   loginTeacher: async (email, password) => {
     set({ authLoading: true, authError: null });
 
-    if (isFirebaseConfigured && auth) {
+    if (!isLocalStorageFallback && auth) {
       try {
         await signInWithEmailAndPassword(auth, email, password);
         return true;
@@ -385,7 +385,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   registerTeacher: async (name, email, password) => {
     set({ authLoading: true, authError: null });
 
-    if (isFirebaseConfigured && auth && db) {
+    if (!isLocalStorageFallback && auth && db) {
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
@@ -448,7 +448,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     get().unsubscribers.forEach((unsub) => unsub());
     set({ unsubscribers: [] });
 
-    if (isFirebaseConfigured && auth) {
+    if (!isLocalStorageFallback && auth) {
       await firebaseSignOut(auth);
     } else {
       localStorage.removeItem("docente_current_teacher");
@@ -480,7 +480,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
 
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "groups", id), newGroup);
       } catch (e) {
@@ -496,7 +496,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   updateGroup: async (groupId, name, schoolYear) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "groups", groupId), { name, schoolYear }, { merge: true });
       } catch (e) {
@@ -514,7 +514,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteGroup: async (groupId) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         // Delete group document
         await deleteDoc(doc(db, "groups", groupId));
@@ -558,7 +558,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       createdAt: new Date().toISOString(),
     }));
 
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         const batch = writeBatch(db);
         importedList.forEach((student) => {
@@ -580,7 +580,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteStudent: async (studentId) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "students", studentId));
         // Also delete student's grades
@@ -617,7 +617,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       percentage,
     };
 
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "categories", id), newCat);
       } catch (e) {
@@ -633,7 +633,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   updateCategory: async (categoryId, name, percentage) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "categories", categoryId), { name, percentage }, { merge: true });
       } catch (e) {
@@ -651,7 +651,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteCategory: async (categoryId) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "categories", categoryId));
         // Clean up grades for this category
@@ -697,7 +697,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       date: new Date().toLocaleDateString("es-MX") || new Date().toISOString().split("T")[0],
     };
 
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "grades", gradeId), gradeObj);
       } catch (e) {
@@ -718,7 +718,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteGrade: async (gradeId) => {
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "grades", gradeId));
       } catch (e) {
@@ -738,7 +738,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     const trimmedMatricula = matricula.trim();
     const trimmedCode = accessCode.trim();
 
-    if (isFirebaseConfigured && db) {
+    if (!isLocalStorageFallback && db) {
       try {
         // Query student where matricula == trimmedMatricula
         const studentsRef = collection(db, "students");
@@ -851,7 +851,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
   // Subscribe to updates for student
   subscribeToStudentData: (studentId, groupId) => {
-    if (!isFirebaseConfigured || !db) return;
+    if (isLocalStorageFallback || !db) return;
 
     // Clear existing student listeners
     get().unsubscribers.forEach((unsub) => unsub());
