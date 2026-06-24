@@ -35,6 +35,7 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
     [allCategories, groupId]
   );
   const deleteStudent = useDocenteStore((state) => state.deleteStudent);
+  const deleteAllStudents = useDocenteStore((state) => state.deleteAllStudents);
   const updateGroup = useDocenteStore((state) => state.updateGroup);
   const deleteGroup = useDocenteStore((state) => state.deleteGroup);
 
@@ -330,17 +331,32 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
                   <h3 className="text-base font-bold text-slate-800">Directorio de Alumnos</h3>
                   <p className="text-xs text-slate-500">Listado general de alumnos registrados y credenciales de ingreso.</p>
                 </div>
-                <button
-                  id="btn-toggle-add-student"
-                  onClick={() => {
-                    setShowAddSingle(!showAddSingle);
-                    setGroupError(null);
-                  }}
-                  className="flex items-center justify-center gap-1 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition shadow-sm self-start"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  {showAddSingle ? "Cerrar Registro" : "Registrar Alumno Individual"}
-                </button>
+                <div className="flex items-center gap-2 self-start">
+                  <button
+                    onClick={async () => {
+                      if (students.length === 0) return;
+                      if (confirm("¿Estás seguro de que deseas eliminar a TODOS los alumnos de este grupo? Esta acción también borrará sus calificaciones y es irreversible.")) {
+                        await deleteAllStudents(groupId);
+                      }
+                    }}
+                    disabled={students.length === 0}
+                    className="flex items-center justify-center gap-1 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 disabled:opacity-50 text-xs font-bold rounded-lg transition shadow-sm"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar Todos
+                  </button>
+                  <button
+                    id="btn-toggle-add-student"
+                    onClick={() => {
+                      setShowAddSingle(!showAddSingle);
+                      setGroupError(null);
+                    }}
+                    className="flex items-center justify-center gap-1 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {showAddSingle ? "Cerrar Registro" : "Registrar Alumno Individual"}
+                  </button>
+                </div>
               </div>
 
               {/* Single student add form */}

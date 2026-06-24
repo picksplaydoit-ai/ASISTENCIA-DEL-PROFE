@@ -41,6 +41,7 @@ export default function App() {
   const groups = useDocenteStore((state) => state.groups);
   const students = useDocenteStore((state) => state.students);
   const createGroup = useDocenteStore((state) => state.createGroup);
+  const deleteGroup = useDocenteStore((state) => state.deleteGroup);
   const activeGroupId = useDocenteStore((state) => state.activeGroupId);
   const setActiveGroup = useDocenteStore((state) => state.setActiveGroup);
 
@@ -624,6 +625,7 @@ export default function App() {
                           group={group}
                           students={students}
                           onSelect={(id) => setActiveGroup(id)}
+                          onDelete={(id) => deleteGroup(id)}
                         />
                       ))}
                     </div>

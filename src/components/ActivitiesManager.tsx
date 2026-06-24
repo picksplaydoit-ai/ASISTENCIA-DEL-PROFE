@@ -11,6 +11,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const allGrades = useDocenteStore(state => state.grades);
   const createActivity = useDocenteStore(state => state.createActivity);
   const deleteActivity = useDocenteStore(state => state.deleteActivity);
+  const deleteAllActivities = useDocenteStore(state => state.deleteAllActivities);
   const saveGrade = useDocenteStore(state => state.saveGrade);
   
   const [showModal, setShowModal] = useState(false);
@@ -131,6 +132,18 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
           <p className="text-xs text-slate-500">Define las actividades a calificar en cada categoría.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={async () => {
+              if (activities.length === 0) return;
+              if (confirm("¿Estás seguro de que deseas eliminar TODAS las actividades de este grupo? Las calificaciones asociadas se perderán.")) {
+                await deleteAllActivities(groupId);
+              }
+            }}
+            disabled={activities.length === 0}
+            className="w-full sm:w-auto flex justify-center items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0"
+          >
+            <Trash2 className="w-4 h-4" /> Eliminar Todas
+          </button>
           <select
             value={filterCategoryId}
             onChange={(e) => setFilterCategoryId(e.target.value)}

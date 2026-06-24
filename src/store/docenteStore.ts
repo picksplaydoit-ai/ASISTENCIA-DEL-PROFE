@@ -79,6 +79,7 @@ interface DocenteState {
   importStudents: (groupId: string, studentsToImport: { name: string; matricula: string }[]) => Promise<Student[]>;
   updateStudentOverride: (studentId: string, manualFinalGrade: number | null, manualStatus: "Aprobado" | "Reprobado" | "SD" | null) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
+  deleteAllStudents: (groupId: string) => Promise<void>;
 
   // Category CRUD
   createCategory: (groupId: string, name: string, percentage: number) => Promise<void>;
@@ -89,6 +90,7 @@ interface DocenteState {
   createActivity: (groupId: string, categoryId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
   updateActivity: (activityId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
   deleteActivity: (activityId: string) => Promise<void>;
+  deleteAllActivities: (groupId: string) => Promise<void>;
 
   // Team CRUD
   createTeam: (groupId: string, name: string, studentIds: string[]) => Promise<void>;
@@ -752,6 +754,48 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     }
   },
 
+  deleteAllStudents: async (groupId) => {
+    if (!isLocalStorageFallback && db) {
+      try {
+        const qStudents = query(collection(db, "students"), where("groupId", "==", groupId));
+        const snapStudents = await getDocs(qStudents);
+        const batch = writeBatch(db);
+        const studentIds: string[] = [];
+        
+        snapStudents.forEach((d) => {
+          studentIds.push(d.id);
+          batch.delete(doc(db, "students", d.id));
+        });
+        
+        // Also delete grades
+        if (studentIds.length > 0) {
+          // split into chunks if > 10
+          for (let i = 0; i < studentIds.length; i += 10) {
+            const chunk = studentIds.slice(i, i + 10);
+            const qGrades = query(collection(db, "grades"), where("studentId", "in", chunk));
+            const snapGrades = await getDocs(qGrades);
+            snapGrades.forEach(g => batch.delete(doc(db, "grades", g.id)));
+          }
+        }
+        
+        await batch.commit();
+      } catch (e) {
+        console.error("Error deleting all students:", e);
+      }
+    } else {
+      set((state) => {
+        const studentIdsToRemove = new Set(state.students.filter(s => s.groupId === groupId).map(s => s.id));
+        const updatedStudents = state.students.filter((s) => s.groupId !== groupId);
+        const updatedGrades = state.grades.filter((g) => !studentIdsToRemove.has(g.studentId));
+        setTimeout(() => get().saveLocalData(), 0);
+        return {
+          students: updatedStudents,
+          grades: updatedGrades,
+        };
+      });
+    }
+  },
+
   // CATEGORY CRUD
   createCategory: async (groupId, name, percentage) => {
     const id = generateUUID();
@@ -921,6 +965,46 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         grades: state.grades.filter((g) => g.activityId !== activityId)
       }));
       setTimeout(() => get().saveLocalData(), 0);
+    }
+  },
+
+  deleteAllActivities: async (groupId) => {
+    if (!isLocalStorageFallback && db) {
+      try {
+        const qAct = query(collection(db, "activities"), where("groupId", "==", groupId));
+        const snapAct = await getDocs(qAct);
+        const batch = writeBatch(db);
+        const activityIds: string[] = [];
+        
+        snapAct.forEach((d) => {
+          activityIds.push(d.id);
+          batch.delete(doc(db, "activities", d.id));
+        });
+        
+        // delete related grades
+        if (activityIds.length > 0) {
+          for (let i = 0; i < activityIds.length; i += 10) {
+            const chunk = activityIds.slice(i, i + 10);
+            const qGrades = query(collection(db, "grades"), where("activityId", "in", chunk));
+            const snapGrades = await getDocs(qGrades);
+            snapGrades.forEach(g => batch.delete(doc(db, "grades", g.id)));
+          }
+        }
+        await batch.commit();
+      } catch (e) {
+        console.error("Error deleting all activities:", e);
+      }
+    } else {
+      set((state) => {
+        const actIdsToRemove = new Set(state.activities.filter(a => a.groupId === groupId).map(a => a.id));
+        const updatedActs = state.activities.filter((a) => a.groupId !== groupId);
+        const updatedGrades = state.grades.filter((g) => !g.activityId || !actIdsToRemove.has(g.activityId));
+        setTimeout(() => get().saveLocalData(), 0);
+        return { 
+          activities: updatedActs,
+          grades: updatedGrades
+        };
+      });
     }
   },
 
