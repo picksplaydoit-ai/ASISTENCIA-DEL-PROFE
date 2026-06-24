@@ -7,6 +7,7 @@ import React, { useState, useRef } from "react";
 import { useDocenteStore } from "../store/docenteStore";
 import { Student } from "../types";
 import { Upload, Clipboard, Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import Papa from "papaparse";
 
 interface StudentImporterProps {
   groupId: string;
@@ -24,70 +25,69 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse lines into Name and Matricula
   const parseRawText = (text: string) => {
     setError(null);
-    const lines = text.split("\n");
-    const parsed: { name: string; matricula: string }[] = [];
+    Papa.parse(text, {
+      skipEmptyLines: true,
+      complete: (results) => {
+        const data = results.data as string[][];
+        if (data.length === 0) {
+          setError("El archivo o texto está vacío.");
+          return;
+        }
 
-    // Skip header common names
-    const isHeader = (line: string) => {
-      const lower = line.toLowerCase();
-      return (
-        lower.includes("alumno") ||
-        lower.includes("nombre") ||
-        lower.includes("matricula") ||
-        lower.includes("matrícula") ||
-        lower.includes("student") ||
-        lower.includes("id")
-      );
-    };
+        const parsed: { name: string; matricula: string }[] = [];
+        const firstRow = data[0].map(h => h.trim().toLowerCase());
 
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
+        // Helper to check if row looks like a header
+        const isHeaderRow = firstRow.some(h => 
+          h.includes("alumno") || h.includes("nombre") || h.includes("matricula") || 
+          h.includes("matrícula") || h.includes("name") || h.includes("id")
+        );
 
-      // Detect header and skip
-      if (parsed.length === 0 && isHeader(trimmed)) {
-        return;
-      }
+        let nameIndex = -1;
+        let matriculaIndex = -1;
+        let startIndex = 0;
 
-      // Support comma, semicolon, or tab separation
-      let parts: string[] = [];
-      if (trimmed.includes("\t")) {
-        parts = trimmed.split("\t");
-      } else if (trimmed.includes(",")) {
-        parts = trimmed.split(",");
-      } else if (trimmed.includes(";")) {
-        parts = trimmed.split(";");
-      } else {
-        // Fallback space separated or single value
-        const lastSpace = trimmed.lastIndexOf(" ");
-        if (lastSpace !== -1) {
-          parts = [trimmed.substring(0, lastSpace).trim(), trimmed.substring(lastSpace).trim()];
+        if (isHeaderRow) {
+          startIndex = 1;
+          nameIndex = firstRow.findIndex(h => /nombre|^name$|estudiante|alumno/i.test(h) && !/yomi|family|given|additional/i.test(h));
+          if (nameIndex === -1) {
+            nameIndex = firstRow.findIndex(h => /nombre|name/i.test(h));
+          }
+          matriculaIndex = firstRow.findIndex(h => /matr[ií]cula|c[oó]digo|id|^notes$/i.test(h));
+          
+          if (nameIndex === -1) nameIndex = 0;
+          if (matriculaIndex === -1) matriculaIndex = 1;
         } else {
-          parts = [trimmed];
+          nameIndex = 0;
+          matriculaIndex = 1;
         }
-      }
 
-      if (parts.length >= 2) {
-        const name = parts[0].trim().replace(/^["']|["']$/g, ""); // clean quotes
-        const matricula = parts[1].trim().replace(/^["']|["']$/g, "");
-        if (name && matricula) {
-          parsed.push({ name, matricula });
+        for (let i = startIndex; i < data.length; i++) {
+          const row = data[i];
+          const name = row[nameIndex]?.trim();
+          let matricula = row[matriculaIndex]?.trim();
+
+          if (name) {
+            if (!matricula) {
+              matricula = "TEMP_" + Math.floor(1000 + Math.random() * 9000);
+            }
+            parsed.push({ name, matricula });
+          }
         }
-      } else if (parts.length === 1 && parts[0]) {
-        // If single item, treat as Name and assign temporary matricula or vice versa
-        const val = parts[0].trim();
-        parsed.push({ name: val, matricula: "TEMP_" + Math.floor(1000 + Math.random() * 9000) });
+
+        if (parsed.length === 0) {
+          setError("No se encontraron datos válidos.");
+        } else {
+          setPreviewList(parsed);
+        }
+      },
+      error: (err) => {
+        console.error("PapaParse error:", err);
+        setError("Ocurrió un error al procesar el archivo CSV.");
       }
     });
-
-    if (parsed.length === 0) {
-      setError("No se encontraron datos válidos. Asegúrese de incluir Alumno y Matrícula separados por coma o tabulaciones.");
-    } else {
-      setPreviewList(parsed);
-    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
