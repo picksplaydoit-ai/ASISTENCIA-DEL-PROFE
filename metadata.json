@@ -1,0 +1,6 @@
+{
+  "name": "Sistema Docente Simple",
+  "description": "Administración simple de grupos, alumnos, categorías de evaluación y calificaciones en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
