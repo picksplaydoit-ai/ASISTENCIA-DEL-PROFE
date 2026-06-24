@@ -113,6 +113,8 @@ let categoriesUnsubscribe: (() => void) | null = null;
 let gradesUnsubscribe: (() => void) | null = null;
 let studentPortalUnsubscribers: (() => void)[] = [];
 let lastSubscribedGroupIds: string[] = [];
+let activeSubscribedTeacherId: string | null = null;
+let activeSubscribedStudentId: string | null = null;
 
 const arraysAreEqual = (a: string[], b: string[]): boolean => {
   if (a.length !== b.length) return false;
@@ -138,11 +140,13 @@ const clearTeacherSubscriptions = () => {
     gradesUnsubscribe();
     gradesUnsubscribe = null;
   }
+  activeSubscribedTeacherId = null;
 };
 
 const clearStudentPortalSubscriptions = () => {
   studentPortalUnsubscribers.forEach((unsub) => unsub());
   studentPortalUnsubscribers = [];
+  activeSubscribedStudentId = null;
 };
 
 export const useDocenteStore = create<DocenteState>((set, get) => ({
@@ -271,9 +275,14 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   subscribeToTeacherData: (teacherId: string) => {
     if (isLocalStorageFallback || !db) return;
 
+    if (activeSubscribedTeacherId === teacherId && groupsUnsubscribe) {
+      return;
+    }
+
     // Clear existing subs
     clearTeacherSubscriptions();
     lastSubscribedGroupIds = [];
+    activeSubscribedTeacherId = teacherId;
 
     try {
       // 1. Subscribe to Groups
@@ -906,10 +915,15 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   subscribeToStudentData: (studentId, groupId) => {
     if (isLocalStorageFallback || !db) return;
 
+    if (activeSubscribedStudentId === studentId && studentPortalUnsubscribers.length > 0) {
+      return;
+    }
+
     // Clear existing student listeners
     clearStudentPortalSubscriptions();
     clearTeacherSubscriptions(); // Clear teacher subscriptions just in case
     lastSubscribedGroupIds = [];
+    activeSubscribedStudentId = studentId;
 
     try {
       // 1. Subscribe to Categories for student's group
