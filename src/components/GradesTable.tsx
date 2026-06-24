@@ -57,11 +57,15 @@ export function calculateStudentGrades(
 }
 
 export default function GradesTable({ groupId }: GradesTableProps) {
-  const students = useDocenteStore((state) =>
-    state.students.filter((s) => s.groupId === groupId)
+  const allStudents = useDocenteStore((state) => state.students);
+  const students = React.useMemo(() =>
+    allStudents.filter((s) => s.groupId === groupId),
+    [allStudents, groupId]
   );
-  const categories = useDocenteStore((state) =>
-    state.categories.filter((c) => c.groupId === groupId)
+  const allCategories = useDocenteStore((state) => state.categories);
+  const categories = React.useMemo(() =>
+    allCategories.filter((c) => c.groupId === groupId),
+    [allCategories, groupId]
   );
   const grades = useDocenteStore((state) => state.grades);
   const saveGrade = useDocenteStore((state) => state.saveGrade);

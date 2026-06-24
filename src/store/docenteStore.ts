@@ -292,7 +292,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         snapshot.forEach((d) => {
           groupsList.push({ id: d.id, ...d.data() } as Group);
         });
-        set({ groups: groupsList.sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+        set({ groups: groupsList.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")) });
 
         // Subscribe to items belonging to these groups
         const groupIds = groupsList.map((g) => g.id);
@@ -578,9 +578,35 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   deleteGroup: async (groupId) => {
     if (!isLocalStorageFallback && db) {
       try {
-        // Delete group document
-        await deleteDoc(doc(db, "groups", groupId));
-        // Students, categories, grades will be kept or deleted. The instructions ask us to keep it simple, but let's delete them from store manually.
+        // 1. Query students in the group
+        const studentsQuery = query(collection(db, "students"), where("groupId", "==", groupId));
+        const studentsSnap = await getDocs(studentsQuery);
+        
+        const batch = writeBatch(db);
+        
+        // 2. Query grades for each student in the group and delete them
+        for (const studentDoc of studentsSnap.docs) {
+          const gradesQuery = query(collection(db, "grades"), where("studentId", "==", studentDoc.id));
+          const gradesSnap = await getDocs(gradesQuery);
+          gradesSnap.forEach((gradeDoc) => {
+            batch.delete(gradeDoc.ref);
+          });
+          // Delete student
+          batch.delete(studentDoc.ref);
+        }
+
+        // 3. Query and delete categories
+        const categoriesQuery = query(collection(db, "categories"), where("groupId", "==", groupId));
+        const categoriesSnap = await getDocs(categoriesQuery);
+        categoriesSnap.forEach((catDoc) => {
+          batch.delete(catDoc.ref);
+        });
+
+        // 4. Delete the group document
+        batch.delete(doc(db, "groups", groupId));
+
+        // Commit batch
+        await batch.commit();
       } catch (e) {
         console.error("Error deleting group from Firestore:", e);
       }

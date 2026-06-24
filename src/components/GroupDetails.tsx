@@ -16,9 +16,21 @@ interface GroupDetailsProps {
 }
 
 export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
-  const group = useDocenteStore((state) => state.groups.find((g) => g.id === groupId));
-  const students = useDocenteStore((state) => state.students.filter((s) => s.groupId === groupId));
-  const categories = useDocenteStore((state) => state.categories.filter((c) => c.groupId === groupId));
+  const groups = useDocenteStore((state) => state.groups);
+  const group = React.useMemo(() =>
+    groups.find((g) => g.id === groupId),
+    [groups, groupId]
+  );
+  const allStudents = useDocenteStore((state) => state.students);
+  const students = React.useMemo(() =>
+    allStudents.filter((s) => s.groupId === groupId),
+    [allStudents, groupId]
+  );
+  const allCategories = useDocenteStore((state) => state.categories);
+  const categories = React.useMemo(() =>
+    allCategories.filter((c) => c.groupId === groupId),
+    [allCategories, groupId]
+  );
   const deleteStudent = useDocenteStore((state) => state.deleteStudent);
   const updateGroup = useDocenteStore((state) => state.updateGroup);
   const deleteGroup = useDocenteStore((state) => state.deleteGroup);

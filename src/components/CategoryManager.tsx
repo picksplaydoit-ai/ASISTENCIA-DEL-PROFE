@@ -12,8 +12,10 @@ interface CategoryManagerProps {
 }
 
 export default function CategoryManager({ groupId }: CategoryManagerProps) {
-  const categories = useDocenteStore((state) =>
-    state.categories.filter((c) => c.groupId === groupId)
+  const allCategories = useDocenteStore((state) => state.categories);
+  const categories = React.useMemo(() =>
+    allCategories.filter((c) => c.groupId === groupId),
+    [allCategories, groupId]
   );
   const createCategory = useDocenteStore((state) => state.createCategory);
   const updateCategory = useDocenteStore((state) => state.updateCategory);
