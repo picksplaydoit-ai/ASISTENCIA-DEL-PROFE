@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from "react";
+import * as XLSX from "xlsx";
 import { useDocenteStore } from "../store/docenteStore";
-import { Student, Category, Grade } from "../types";
-import { Save, HelpCircle, Edit3, ClipboardList, Check, TrendingUp, AlertCircle, LayoutDashboard, CalendarDays, Edit, X } from "lucide-react";
+import { Student, Category, Grade, Activity } from "../types";
+import { Save, HelpCircle, Edit3, ClipboardList, Check, TrendingUp, AlertCircle, LayoutDashboard, CalendarDays, Edit, X, Download, Minus } from "lucide-react";
 
 interface GradesTableProps {
   groupId: string;
@@ -79,7 +80,7 @@ export function calculateStudentGrades(
   }
 
   // Apply manual overrides if present
-  let effectiveGrade = student.manualFinalGrade !== undefined && student.manualFinalGrade !== null ? student.manualFinalGrade : (hasDerecho ? roundedGrade : 0);
+  let effectiveGrade = student.manualFinalGrade !== undefined && student.manualFinalGrade !== null ? student.manualFinalGrade : roundedGrade;
   
   let isPassed = effectiveGrade >= 60;
   let statusText = !hasDerecho ? "SD" : (isPassed ? "Aprobado" : "Reprobado");
@@ -157,15 +158,82 @@ export default function GradesTable({ groupId }: GradesTableProps) {
     ? (groupResults.reduce((acc, r) => acc + r.attendancePct, 0) / totalStudents).toFixed(0)
     : "0";
 
+  const exportToExcel = () => {
+    const gradesData = groupResults.map((res, i) => {
+      const student = students[i];
+      const row: any = {
+        Matrícula: student.matricula,
+        Alumno: student.name,
+      };
+      categories.forEach(cat => {
+        row[`${cat.name} (${cat.percentage}%)`] = (res.categoryAverages[cat.id]?.avg || 0).toFixed(1);
+      });
+      row["Asistencias (%)"] = `${res.attendancePct}%`;
+      row["Promedio Final"] = res.finalGrade;
+      row["Estatus"] = res.statusText;
+      return row;
+    });
+    
+    const attendanceData = groupResults.map((res, i) => {
+      const student = students[i];
+      const row: any = {
+        Matrícula: student.matricula,
+        Alumno: student.name,
+        "Asistencias (%)": `${res.attendancePct}%`,
+      };
+      attendances.sort((a, b) => a.date.localeCompare(b.date)).forEach(att => {
+        const status = att.records ? att.records[student.id] : undefined;
+        let strStatus = "Falta";
+        if (status === true || status === "present") strStatus = "Presente";
+        if (status === "justified") strStatus = "Justificada";
+        row[att.date] = strStatus;
+      });
+      return row;
+    });
+
+    const wb = XLSX.utils.book_new();
+    const wsGrades = XLSX.utils.json_to_sheet(gradesData);
+    const wsAttendance = XLSX.utils.json_to_sheet(attendanceData);
+    
+    const activitiesData: any[] = [];
+    students.forEach(student => {
+      grades.filter(g => g.studentId === student.id).forEach(g => {
+        activitiesData.push({
+          Matrícula: student.matricula,
+          Alumno: student.name,
+          Actividad: g.activityName,
+          Categoría: categories.find(c => c.id === g.categoryId)?.name || 'Sin Categoría',
+          Fecha: g.date,
+          Calificación: g.grade,
+        });
+      });
+    });
+    const wsActivities = XLSX.utils.json_to_sheet(activitiesData);
+
+    XLSX.utils.book_append_sheet(wb, wsGrades, "Calificaciones");
+    XLSX.utils.book_append_sheet(wb, wsAttendance, "Asistencias");
+    XLSX.utils.book_append_sheet(wb, wsActivities, "Actividades Detalladas");
+    
+    XLSX.writeFile(wb, `Reporte_Grupo_${group?.name || "SinNombre"}.xlsx`);
+  };
+
   return (
     <div id="grades-table-root" className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 max-w-5xl mx-auto">
       {/* Header tabs */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4 mb-6">
         <div>
           <h3 className="text-lg font-semibold text-slate-800">Resultados del Grupo</h3>
           <p className="text-sm text-slate-500">Visualiza el avance ponderado, asistencias y dashboard.</p>
         </div>
-        <div className="flex flex-wrap bg-slate-50 p-1 rounded-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <button 
+            onClick={exportToExcel}
+            className="flex justify-center items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold rounded-lg transition"
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel
+          </button>
+          <div className="flex flex-wrap bg-slate-50 p-1 rounded-lg">
           <button
             onClick={() => setActiveTab("dashboard")}
             className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-md transition ${
@@ -202,6 +270,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
             <CalendarDays className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Asistencias Detalle</span>
           </button>
+          </div>
         </div>
       </div>
 

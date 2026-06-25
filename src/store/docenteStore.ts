@@ -51,6 +51,7 @@ interface DocenteState {
   activeStudentCategories: Category[];
   activeStudentGrades: Grade[];
   activeStudentActivities: Activity[];
+  activeStudentAttendances: Attendance[];
 
   // Database mode info
   isFirebaseMode: boolean;
@@ -206,6 +207,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   activeStudentCategories: [],
   activeStudentGrades: [],
   activeStudentActivities: [],
+  activeStudentAttendances: [],
 
   isFirebaseMode: !isLocalStorageFallback,
 
@@ -1207,20 +1209,23 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
       const matchedGroup = allLocalGroups.find((g) => g.id === matchedStudent.groupId) || null;
 
-        // Also grab teacherId to get categories, grades, and activities
+        // Also grab teacherId to get categories, grades, activities, and attendances
       let studentCats: Category[] = [];
       let studentGrades: Grade[] = [];
       let studentActivities: Activity[] = [];
+      let studentAttendances: Attendance[] = [];
 
       if (matchedGroup) {
         const teacherId = matchedGroup.teacherId;
         const localCats = JSON.parse(localStorage.getItem(`docente_categories_${teacherId}`) || "[]");
         const localGrades = JSON.parse(localStorage.getItem(`docente_grades_${teacherId}`) || "[]");
         const localActivities = JSON.parse(localStorage.getItem(`docente_activities_${teacherId}`) || "[]");
+        const localAttendances = JSON.parse(localStorage.getItem(`docente_attendances_${teacherId}`) || "[]");
 
         studentCats = localCats.filter((c: Category) => c.groupId === matchedStudent.groupId);
         studentGrades = localGrades.filter((g: Grade) => g.studentId === matchedStudent.id);
         studentActivities = localActivities.filter((a: Activity) => a.groupId === matchedStudent.groupId);
+        studentAttendances = localAttendances.filter((a: Attendance) => a.groupId === matchedStudent.groupId);
       }
 
       set({
@@ -1229,6 +1234,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         activeStudentCategories: studentCats,
         activeStudentGrades: studentGrades,
         activeStudentActivities: studentActivities,
+        activeStudentAttendances: studentAttendances,
         currentView: "student-dashboard",
       });
 
@@ -1293,7 +1299,17 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         set({ activeStudentActivities: activitiesList });
       });
 
-      studentPortalUnsubscribers.push(unsubCats, unsubGrades, unsubActivities);
+      // 4. Subscribe to Attendances for this student's group
+      const attendancesQuery = query(collection(db, "attendances"), where("groupId", "==", groupId));
+      const unsubAttendances = onSnapshot(attendancesQuery, (snapshot) => {
+        const attendancesList: Attendance[] = [];
+        snapshot.forEach((doc) => {
+          attendancesList.push({ id: doc.id, ...doc.data() } as Attendance);
+        });
+        set({ activeStudentAttendances: attendancesList });
+      });
+
+      studentPortalUnsubscribers.push(unsubCats, unsubGrades, unsubActivities, unsubAttendances);
     } catch (e) {
       console.error("Error subscribing to student portal data:", e);
     }
