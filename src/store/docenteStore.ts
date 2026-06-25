@@ -131,6 +131,9 @@ let groupsUnsubscribe: (() => void) | null = null;
 let studentsUnsubscribe: (() => void) | null = null;
 let categoriesUnsubscribe: (() => void) | null = null;
 let gradesUnsubscribe: (() => void) | null = null;
+let activitiesUnsubscribe: (() => void) | null = null;
+let attendancesUnsubscribe: (() => void) | null = null;
+let teamsUnsubscribe: (() => void) | null = null;
 let studentPortalUnsubscribers: (() => void)[] = [];
 let lastSubscribedGroupIds: string[] = [];
 let activeSubscribedTeacherId: string | null = null;
@@ -159,6 +162,18 @@ const clearTeacherSubscriptions = () => {
   if (gradesUnsubscribe) {
     gradesUnsubscribe();
     gradesUnsubscribe = null;
+  }
+  if (activitiesUnsubscribe) {
+    activitiesUnsubscribe();
+    activitiesUnsubscribe = null;
+  }
+  if (attendancesUnsubscribe) {
+    attendancesUnsubscribe();
+    attendancesUnsubscribe = null;
+  }
+  if (teamsUnsubscribe) {
+    teamsUnsubscribe();
+    teamsUnsubscribe = null;
   }
   activeSubscribedTeacherId = null;
 };
@@ -367,11 +382,23 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       gradesUnsubscribe();
       gradesUnsubscribe = null;
     }
+    if (activitiesUnsubscribe) {
+      activitiesUnsubscribe();
+      activitiesUnsubscribe = null;
+    }
+    if (attendancesUnsubscribe) {
+      attendancesUnsubscribe();
+      attendancesUnsubscribe = null;
+    }
+    if (teamsUnsubscribe) {
+      teamsUnsubscribe();
+      teamsUnsubscribe = null;
+    }
 
     lastSubscribedGroupIds = [...groupIds];
 
     try {
-      // We do real-time onSnapshot for students, categories, and grades
+      // We do real-time onSnapshot for students, categories, grades, activities, attendances, teams
       // 2. Subscribe to Students
       const studentsQuery = query(collection(db, "students"), where("groupId", "in", groupIds));
       studentsUnsubscribe = onSnapshot(studentsQuery, (snapshot) => {
@@ -406,6 +433,42 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         set({ grades: gradesList });
       }, (error) => {
         console.error("Error subscribing to grades:", error);
+      });
+
+      // 5. Subscribe to Activities
+      const activitiesQuery = query(collection(db, "activities"), where("groupId", "in", groupIds));
+      activitiesUnsubscribe = onSnapshot(activitiesQuery, (snapshot) => {
+        const activitiesList: Activity[] = [];
+        snapshot.forEach((d) => {
+          activitiesList.push({ id: d.id, ...d.data() } as Activity);
+        });
+        set({ activities: activitiesList });
+      }, (error) => {
+        console.error("Error subscribing to activities:", error);
+      });
+
+      // 6. Subscribe to Attendances
+      const attendancesQuery = query(collection(db, "attendances"), where("groupId", "in", groupIds));
+      attendancesUnsubscribe = onSnapshot(attendancesQuery, (snapshot) => {
+        const attendancesList: Attendance[] = [];
+        snapshot.forEach((d) => {
+          attendancesList.push({ id: d.id, ...d.data() } as Attendance);
+        });
+        set({ attendances: attendancesList });
+      }, (error) => {
+        console.error("Error subscribing to attendances:", error);
+      });
+
+      // 7. Subscribe to Teams
+      const teamsQuery = query(collection(db, "teams"), where("groupId", "in", groupIds));
+      teamsUnsubscribe = onSnapshot(teamsQuery, (snapshot) => {
+        const teamsList: Team[] = [];
+        snapshot.forEach((d) => {
+          teamsList.push({ id: d.id, ...d.data() } as Team);
+        });
+        set({ teams: teamsList });
+      }, (error) => {
+        console.error("Error subscribing to teams:", error);
       });
     } catch (e) {
       console.error("Error subscribing to group subdata:", e);

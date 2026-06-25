@@ -349,6 +349,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                 <tr>
                   <th className="px-4 py-3.5 w-16">Matrícula</th>
                   <th className="px-4 py-3.5 min-w-[150px]">Alumno</th>
+                  <th className="px-4 py-3.5 text-center font-bold text-slate-800 bg-slate-100 border-r border-slate-100">%</th>
                   <th className="px-4 py-3.5 text-center font-bold text-slate-800 bg-slate-100 border-r border-slate-100">Asistencias</th>
                   <th className="px-4 py-3.5 text-center font-bold text-slate-800 bg-slate-100 border-r border-slate-100">Faltas</th>
                   <th className="px-4 py-3.5 min-w-[120px] bg-slate-100 border-r border-slate-100">Días de Falta</th>
@@ -374,10 +375,16 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                     }
                   });
 
+                  const totalDays = presents + absents;
+                  const pct = totalDays > 0 ? Math.round((presents / totalDays) * 100) : 0;
+
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-4 py-2.5 font-mono font-medium text-slate-500">{student.matricula}</td>
                       <td className="px-4 py-2.5 font-semibold text-slate-800 truncate max-w-[200px]" title={student.name}>{student.name}</td>
+                      <td className="px-4 py-2.5 text-center font-bold bg-slate-50 border-x border-slate-100">
+                        <span className={pct >= (group?.requiredAttendancePercentage || 0) ? 'text-emerald-600' : 'text-rose-600'}>{pct}%</span>
+                      </td>
                       <td className="px-4 py-2.5 text-center font-bold text-emerald-600 bg-slate-50 border-x border-slate-100">
                         {presents}
                       </td>
