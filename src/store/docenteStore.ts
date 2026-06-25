@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 import { Teacher, Group, Student, Category, Grade, Activity, Attendance, Team } from "../types";
+import { getMexicoCityDateString } from "../lib/dateUtils";
 import { db, auth, isLocalStorageFallback } from "../lib/firebase";
 import {
   collection,
@@ -956,7 +957,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       activityId,
       delivered,
       deliveredWorks,
-      date: new Date().toLocaleDateString("es-MX") || new Date().toISOString().split("T")[0],
+      date: getMexicoCityDateString(),
     };
 
     if (!isLocalStorageFallback && db) {

@@ -563,7 +563,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                       <th key={act.id} className="px-4 py-3.5 text-center min-w-[100px]">
                         <div className="font-semibold text-slate-800">{act.name}</div>
                         <div className="text-[9px] text-slate-400 mt-0.5">
-                          {act.type === 'numeric' ? 'Calif (0-100)' : act.type === 'boolean' ? 'Entregado (Sí/No)' : `Trabajos (/${act.totalWorks})`}
+                          {act.type === 'numeric' ? 'Calif (0-100)' : act.type === 'boolean' ? 'Entregado' : `Trabajos (/${act.totalWorks})`}
                         </div>
                       </th>
                     ))

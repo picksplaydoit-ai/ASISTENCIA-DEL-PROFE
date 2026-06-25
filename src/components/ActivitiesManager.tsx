@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useDocenteStore } from "../store/docenteStore";
 import { ActivityType, Activity, Grade } from "../types";
-import { Plus, Edit2, Trash2, Search, Target, Users, BookOpen, Calculator, CheckCircle } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, Target, Users, BookOpen, Calculator, CheckCircle, Check, X } from "lucide-react";
+import { getMexicoCityDateString } from "../lib/dateUtils";
 
 export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const categories = useDocenteStore(state => state.categories).filter(c => c.groupId === groupId);
@@ -22,7 +23,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const [type, setType] = useState<ActivityType>("numeric");
   const [totalWorks, setTotalWorks] = useState(10);
   const [isTeamActivity, setIsTeamActivity] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(getMexicoCityDateString());
 
   // Grading Modal State
   const [gradingActivity, setGradingActivity] = useState<Activity | null>(null);
@@ -52,7 +53,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
     setType("numeric");
     setTotalWorks(10);
     setIsTeamActivity(false);
-    setDate(new Date().toISOString().split("T")[0]);
+    setDate(getMexicoCityDateString());
     setEditingActivityId(null);
     setShowModal(true);
   };
@@ -63,7 +64,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
     setType(act.type);
     setTotalWorks(act.totalWorks || 10);
     setIsTeamActivity(act.isTeamActivity || false);
-    setDate(act.date || new Date().toISOString().split("T")[0]);
+    setDate(act.date || getMexicoCityDateString());
     setEditingActivityId(act.id);
     setShowModal(true);
   };
@@ -350,9 +351,14 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
 function GradeInput({ type, val, setVal, max }: { type: ActivityType, val: any, setVal: (v: any) => void, max?: number }) {
   if (type === 'boolean') {
     return (
-      <button onClick={() => setVal(!val)} className={`px-3 py-1 rounded text-xs font-bold transition ${val ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-        {val ? 'ENTREGADO' : 'NO ENTREGADO'}
-      </button>
+      <div className="flex justify-end w-full">
+        <button 
+          onClick={() => setVal(!val)} 
+          className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${val ? 'bg-emerald-500 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+        >
+          {val ? <Check className="w-5 h-5"/> : <X className="w-5 h-5"/>}
+        </button>
+      </div>
     )
   }
   if (type === 'total') {
