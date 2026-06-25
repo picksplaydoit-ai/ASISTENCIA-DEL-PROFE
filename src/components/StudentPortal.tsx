@@ -105,6 +105,7 @@ export default function StudentPortal() {
                 <input
                   id="student-access-code"
                   type="password"
+                  autoComplete="current-password"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
                   placeholder="Ej: A7K9P4X2"

@@ -219,10 +219,14 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         if (firebaseUser) {
           try {
             // Fetch teacher name from Firestore or default to email name
-            const teacherDoc = await getDoc(doc(db, "teachers", firebaseUser.uid));
             let teacherName = firebaseUser.displayName || "Profesor";
-            if (teacherDoc.exists()) {
-              teacherName = teacherDoc.data().name;
+            try {
+              const teacherDoc = await getDoc(doc(db, "teachers", firebaseUser.uid));
+              if (teacherDoc.exists()) {
+                teacherName = teacherDoc.data().name;
+              }
+            } catch (permErr) {
+              console.warn("Could not fetch teacher profile (permissions or missing), using fallback:", permErr);
             }
 
             const teacher: Teacher = {
@@ -243,7 +247,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
             // Fetch live data for teacher
             get().subscribeToTeacherData(firebaseUser.uid);
           } catch (err) {
-            console.error("Error loading teacher info:", err);
+            console.error("Error setting up teacher info:", err);
             set({ authLoading: false });
           }
         } else {

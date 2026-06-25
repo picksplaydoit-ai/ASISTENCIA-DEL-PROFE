@@ -348,6 +348,7 @@ export default function App() {
                     <input
                       id="login-password"
                       type="password"
+                      autoComplete="current-password"
                       value={loginPassword}
                       onChange={(e) => { setLoginPassword(e.target.value); clearAuthError(); }}
                       placeholder="••••••••"
@@ -473,6 +474,7 @@ export default function App() {
                     <input
                       id="reg-password"
                       type="password"
+                      autoComplete="new-password"
                       value={registerPassword}
                       onChange={(e) => { setRegisterPassword(e.target.value); clearAuthError(); }}
                       placeholder="Mínimo 6 caracteres"
