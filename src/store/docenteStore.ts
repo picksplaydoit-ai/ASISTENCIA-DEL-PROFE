@@ -1207,17 +1207,20 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
 
       const matchedGroup = allLocalGroups.find((g) => g.id === matchedStudent.groupId) || null;
 
-      // Also grab teacherId to get categories and grades
+        // Also grab teacherId to get categories, grades, and activities
       let studentCats: Category[] = [];
       let studentGrades: Grade[] = [];
+      let studentActivities: Activity[] = [];
 
       if (matchedGroup) {
         const teacherId = matchedGroup.teacherId;
         const localCats = JSON.parse(localStorage.getItem(`docente_categories_${teacherId}`) || "[]");
         const localGrades = JSON.parse(localStorage.getItem(`docente_grades_${teacherId}`) || "[]");
+        const localActivities = JSON.parse(localStorage.getItem(`docente_activities_${teacherId}`) || "[]");
 
         studentCats = localCats.filter((c: Category) => c.groupId === matchedStudent.groupId);
         studentGrades = localGrades.filter((g: Grade) => g.studentId === matchedStudent.id);
+        studentActivities = localActivities.filter((a: Activity) => a.groupId === matchedStudent.groupId);
       }
 
       set({
@@ -1225,6 +1228,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         activeStudentGroup: matchedGroup,
         activeStudentCategories: studentCats,
         activeStudentGrades: studentGrades,
+        activeStudentActivities: studentActivities,
         currentView: "student-dashboard",
       });
 
@@ -1239,6 +1243,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       activeStudentGroup: null,
       activeStudentCategories: [],
       activeStudentGrades: [],
+      activeStudentActivities: [],
       currentView: "landing",
     });
   },
@@ -1278,7 +1283,17 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         set({ activeStudentGrades: gradesList });
       });
 
-      studentPortalUnsubscribers.push(unsubCats, unsubGrades);
+      // 3. Subscribe to Activities for this student's group
+      const activitiesQuery = query(collection(db, "activities"), where("groupId", "==", groupId));
+      const unsubActivities = onSnapshot(activitiesQuery, (snapshot) => {
+        const activitiesList: Activity[] = [];
+        snapshot.forEach((doc) => {
+          activitiesList.push({ id: doc.id, ...doc.data() } as Activity);
+        });
+        set({ activeStudentActivities: activitiesList });
+      });
+
+      studentPortalUnsubscribers.push(unsubCats, unsubGrades, unsubActivities);
     } catch (e) {
       console.error("Error subscribing to student portal data:", e);
     }

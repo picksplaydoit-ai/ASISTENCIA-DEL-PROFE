@@ -291,8 +291,8 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
               Tipo: {gradingActivity.type === 'numeric' ? '0 a 100' : gradingActivity.type === 'boolean' ? 'Entregado / No Entregado' : `Trabajos (Máx ${gradingActivity.totalWorks})`}
             </p>
             
-            <div className="flex-1 overflow-auto border rounded-lg mb-4">
-              <table className="w-full text-sm text-left">
+            <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg mb-4">
+              <table className="w-full text-sm text-left min-w-[350px]">
                 <thead className="bg-slate-50 border-b sticky top-0">
                   <tr>
                     <th className="p-3 text-slate-500 font-bold">{gradingActivity.isTeamActivity ? "Equipo" : "Alumno"}</th>

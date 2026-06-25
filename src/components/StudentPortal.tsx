@@ -16,6 +16,8 @@ export default function StudentPortal() {
   const accessStudentPortal = useDocenteStore((state) => state.accessStudentPortal);
   const logoutStudent = useDocenteStore((state) => state.logoutStudent);
 
+  const activeStudentActivities = useDocenteStore((state) => state.activeStudentActivities);
+
   // Form input states
   const [matricula, setMatricula] = useState("");
   const [accessCode, setAccessCode] = useState("");
@@ -137,7 +139,7 @@ export default function StudentPortal() {
   }
 
   // If logged in, show student grades report
-  const results = calculateStudentGrades(activeStudent, activeStudentCategories, activeStudentGrades);
+  const results = calculateStudentGrades(activeStudent, activeStudentCategories, activeStudentGrades, [], 0, activeStudentActivities);
   const totalPercentage = activeStudentCategories.reduce((sum, c) => sum + c.percentage, 0);
 
   return (
