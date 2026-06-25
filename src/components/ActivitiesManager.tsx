@@ -10,11 +10,13 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const teams = useDocenteStore(state => state.teams).filter(t => t.groupId === groupId);
   const allGrades = useDocenteStore(state => state.grades);
   const createActivity = useDocenteStore(state => state.createActivity);
+  const updateActivity = useDocenteStore(state => state.updateActivity);
   const deleteActivity = useDocenteStore(state => state.deleteActivity);
   const deleteAllActivities = useDocenteStore(state => state.deleteAllActivities);
   const saveGrade = useDocenteStore(state => state.saveGrade);
   
   const [showModal, setShowModal] = useState(false);
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
   const [type, setType] = useState<ActivityType>("numeric");
@@ -34,9 +36,36 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !categoryId) return;
-    await createActivity(groupId, categoryId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
+    if (editingActivityId) {
+      await updateActivity(editingActivityId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
+    } else {
+      await createActivity(groupId, categoryId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
+    }
     setShowModal(false);
+    setEditingActivityId(null);
     setName("");
+  };
+
+  const openCreateModal = () => {
+    setName("");
+    setCategoryId(categories[0]?.id || "");
+    setType("numeric");
+    setTotalWorks(10);
+    setIsTeamActivity(false);
+    setDate(new Date().toISOString().split("T")[0]);
+    setEditingActivityId(null);
+    setShowModal(true);
+  };
+
+  const openEditModal = (act: Activity) => {
+    setName(act.name);
+    setCategoryId(act.categoryId);
+    setType(act.type);
+    setTotalWorks(act.totalWorks || 10);
+    setIsTeamActivity(act.isTeamActivity || false);
+    setDate(act.date || new Date().toISOString().split("T")[0]);
+    setEditingActivityId(act.id);
+    setShowModal(true);
   };
 
   const openGrading = (act: Activity) => {
@@ -154,7 +183,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
               <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
           </select>
-          <button onClick={() => setShowModal(true)} className="w-full sm:w-auto flex justify-center items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0">
+          <button onClick={openCreateModal} className="w-full sm:w-auto flex justify-center items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shrink-0">
             <Plus className="w-4 h-4"/> Nueva Actividad
           </button>
         </div>
@@ -176,6 +205,9 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
                     <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full">{cat?.name}</span>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button onClick={() => openEditModal(act)} className="p-1.5 text-indigo-400 hover:bg-indigo-50 rounded-md transition">
+                      <Edit2 className="w-4 h-4"/>
+                    </button>
                     <button onClick={() => openGrading(act)} className="px-3 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs font-semibold rounded transition">
                       Calificar
                     </button>
@@ -209,7 +241,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-4">Nueva Actividad</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-4">{editingActivityId ? "Editar Actividad" : "Nueva Actividad"}</h3>
             <form onSubmit={handleSave} className="space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Nombre</label>
@@ -269,17 +301,24 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
                 </thead>
                 <tbody className="divide-y">
                   {gradingActivity.isTeamActivity ? (
-                    teams.map(t => (
+                    teams.map(t => {
+                      const teamStudents = students.filter(s => t.studentIds.includes(s.id));
+                      const sampleStudent = teamStudents.length > 0 ? teamStudents[0].name.split(" ").slice(-2).join(" ") : "Sin alumnos";
+                      
+                      return (
                       <tr key={t.id} className="hover:bg-slate-50">
                         <td className="p-3 font-semibold text-slate-800">
                           {t.name}
-                          <div className="text-[10px] text-slate-400 font-normal">{t.studentIds.length} integrantes</div>
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            {t.studentIds.length} integrantes (Ej. {sampleStudent})
+                          </div>
                         </td>
                         <td className="p-3 text-right">
                           <GradeInput type={gradingActivity.type} val={capturedScores[t.id]} setVal={(v: any) => setCapturedScores(prev => ({...prev, [t.id]: v}))} max={gradingActivity.totalWorks} />
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   ) : (
                     students.map(s => (
                       <tr key={s.id} className="hover:bg-slate-50">

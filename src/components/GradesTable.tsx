@@ -58,7 +58,10 @@ export function calculateStudentGrades(
     const totalClasses = attendances.length;
     
     if (totalClasses > 0) {
-      const studentPresentCount = attendances.filter(a => a.records && a.records[student.id]).length;
+      const studentPresentCount = attendances.filter(a => {
+        const status = a.records && a.records[student.id];
+        return status === true || status === "present" || status === "justified";
+      }).length;
       attendancePct = Math.round((studentPresentCount / totalClasses) * 100);
       hasDerecho = attendancePct >= requiredAttendancePct;
     }
@@ -204,7 +207,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
       {/* TAB: DASHBOARD */}
       {activeTab === "dashboard" && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
               <div className="text-indigo-600 text-xs font-bold uppercase tracking-wider mb-1">Promedio Grupo</div>
               <div className="text-3xl font-black text-indigo-900">{avgFinalGrade}</div>
@@ -216,11 +219,17 @@ export default function GradesTable({ groupId }: GradesTableProps) {
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <div className="text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">Aprobados</div>
               <div className="text-3xl font-black text-blue-900">{approvedCount} <span className="text-sm font-medium text-blue-600/70">/ {totalStudents}</span></div>
+              <div className="text-[10px] font-semibold text-blue-500 mt-1">{totalStudents > 0 ? Math.round((approvedCount / totalStudents) * 100) : 0}% del grupo</div>
             </div>
             <div className="bg-rose-50 border border-rose-100 rounded-xl p-4">
-              <div className="text-rose-600 text-xs font-bold uppercase tracking-wider mb-1">Reprobados / SD</div>
-              <div className="text-3xl font-black text-rose-900">{failedCount + sdCount}</div>
-              <div className="text-[10px] text-rose-500 mt-1">({failedCount} rep, {sdCount} SD)</div>
+              <div className="text-rose-600 text-xs font-bold uppercase tracking-wider mb-1">Reprobados</div>
+              <div className="text-3xl font-black text-rose-900">{failedCount} <span className="text-sm font-medium text-rose-600/70">/ {totalStudents}</span></div>
+              <div className="text-[10px] font-semibold text-rose-500 mt-1">{totalStudents > 0 ? Math.round((failedCount / totalStudents) * 100) : 0}% del grupo</div>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <div className="text-amber-600 text-xs font-bold uppercase tracking-wider mb-1">Sin Derecho (SD)</div>
+              <div className="text-3xl font-black text-amber-900">{sdCount} <span className="text-sm font-medium text-amber-600/70">/ {totalStudents}</span></div>
+              <div className="text-[10px] font-semibold text-amber-500 mt-1">{totalStudents > 0 ? Math.round((sdCount / totalStudents) * 100) : 0}% del grupo</div>
             </div>
           </div>
         </div>
@@ -363,13 +372,18 @@ export default function GradesTable({ groupId }: GradesTableProps) {
               <tbody className="divide-y divide-slate-100">
                 {students.map((student) => {
                   let presents = 0;
+                  let justified = 0;
                   let absents = 0;
                   const absentDays: string[] = [];
 
                   filteredAttendances.forEach(att => {
-                    const isPresent = att.records ? att.records[student.id] : false;
-                    if (isPresent) presents++;
-                    else {
+                    const status = att.records ? att.records[student.id] : false;
+                    if (status === true || status === "present") {
+                      presents++;
+                    } else if (status === "justified") {
+                      justified++;
+                      presents++; // Justified counts towards present total
+                    } else {
                       absents++;
                       absentDays.push(att.date.substring(5)); // MM-DD
                     }
@@ -386,7 +400,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                         <span className={pct >= (group?.requiredAttendancePercentage || 0) ? 'text-emerald-600' : 'text-rose-600'}>{pct}%</span>
                       </td>
                       <td className="px-4 py-2.5 text-center font-bold text-emerald-600 bg-slate-50 border-x border-slate-100">
-                        {presents}
+                        {presents} {justified > 0 && <span className="text-amber-500 text-[10px] ml-1" title="Justificadas">({justified})</span>}
                       </td>
                       <td className="px-4 py-2.5 text-center font-bold text-rose-600 bg-slate-50 border-r border-slate-100">
                         {absents}
@@ -396,11 +410,15 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                       </td>
                       {uniqueDates.map(d => {
                         const att = filteredAttendances.find(a => a.date === d);
-                        const isPresent = att?.records ? att.records[student.id] : false;
+                        const status = att?.records ? att.records[student.id] : undefined;
+                        const isPresent = status === true || status === "present";
+                        const isJustified = status === "justified";
+                        
                         return (
                           <td key={d} className="px-2 py-2.5 text-center">
                             {!att ? <span className="text-slate-300">-</span> : 
                              isPresent ? <Check className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : 
+                             isJustified ? <Minus className="w-3.5 h-3.5 text-amber-500 mx-auto" /> :
                              <X className="w-3.5 h-3.5 text-rose-500 mx-auto" />}
                           </td>
                         );

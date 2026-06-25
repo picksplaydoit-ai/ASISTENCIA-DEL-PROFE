@@ -73,5 +73,5 @@ export interface Attendance {
   id: string;
   groupId: string;
   date: string;
-  records: Record<string, boolean>; // studentId -> true if present, false if absent
+  records: Record<string, boolean | "present" | "absent" | "justified">; // studentId -> status
 }
