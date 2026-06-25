@@ -130,7 +130,7 @@ export default function App() {
       <div id="loader-container" className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
         <div className="flex flex-col items-center">
           <GraduationCap className="w-12 h-12 text-indigo-600 animate-bounce mb-3" />
-          <h2 className="text-sm font-bold text-slate-700">Sistema Docente Simple</h2>
+          <h2 className="text-sm font-bold text-slate-700">Seguimiento PrepMaster</h2>
           <p className="text-xs text-slate-400 mt-1">Cargando credenciales y base de datos...</p>
         </div>
       </div>
@@ -147,7 +147,7 @@ export default function App() {
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <span id="app-title" className="font-extrabold text-sm text-slate-800 block tracking-tight">Sistema Docente</span>
+              <span id="app-title" className="font-extrabold text-sm text-slate-800 block tracking-tight">Seguimiento PrepMaster</span>
               <span className="text-[9px] text-slate-400 block font-semibold tracking-wider uppercase">Simple & Eficiente</span>
             </div>
           </div>
@@ -206,9 +206,10 @@ export default function App() {
               <button
                 id="nav-btn-logout-teacher"
                 onClick={() => logoutTeacher()}
-                className="p-2 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 rounded-lg transition text-slate-500"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 rounded-lg transition text-slate-500 font-semibold text-xs"
                 title="Cerrar sesión Profesor"
               >
+                <span className="hidden sm:inline">Cerrar Sesión</span>
                 <LogOut className="w-4 h-4" />
               </button>
             )}
@@ -647,7 +648,7 @@ export default function App() {
       <footer className="bg-white border-t border-slate-100 py-6 mt-12">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <div>
-            <span>© 2026 <strong>Sistema Docente Simple</strong>. Diseñado para educadores.</span>
+            <span>© 2026 <strong>Seguimiento PrepMaster</strong>. Diseñado para educadores.</span>
           </div>
           <div className="flex gap-4">
             <button id="footer-btn-profes" onClick={() => setView("teacher-login")} className="hover:text-indigo-600 font-semibold transition">Docentes</button>

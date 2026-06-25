@@ -277,7 +277,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
       {/* TAB: DASHBOARD */}
       {activeTab === "dashboard" && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4">
               <div className="text-indigo-600 text-xs font-bold uppercase tracking-wider mb-1">Promedio Grupo</div>
               <div className="text-3xl font-black text-indigo-900">{avgFinalGrade}</div>

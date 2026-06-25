@@ -177,9 +177,9 @@ export default function StudentPortal() {
         <button
           id="btn-logout-portal"
           onClick={logoutStudent}
-          className="flex items-center justify-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl shadow-sm transition shrink-0 self-start"
+          className="flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl shadow-sm transition shrink-0 self-start sm:self-center w-full sm:w-auto"
         >
-          Salir del Portal
+          Cerrar Sesión
           <LogOut className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -214,7 +214,7 @@ export default function StudentPortal() {
       {activeTab === "general" && (
         <div className="space-y-6 animate-fade-in">
           {/* Primary stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* GPA Badge */}
             <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between h-44">
               <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Promedio Final</div>
@@ -277,6 +277,18 @@ export default function StudentPortal() {
             <h3 className="text-base font-bold text-slate-800">Rúbrica y Actividades Detalladas</h3>
             <p className="text-xs text-slate-400">Desglose de calificaciones por categoría de evaluación.</p>
           </div>
+
+          {/* Rubric Summary */}
+          {activeStudentCategories.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              {activeStudentCategories.map((cat) => (
+                <div key={`rubric-${cat.id}`} className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex flex-col justify-between">
+                  <span className="font-bold text-slate-700 text-sm truncate" title={cat.name}>{cat.name}</span>
+                  <span className="text-2xl font-black text-indigo-600 mt-1">{cat.percentage}%</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {activeStudentCategories.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-xs">
