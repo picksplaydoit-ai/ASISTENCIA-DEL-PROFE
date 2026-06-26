@@ -109,7 +109,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
   
   const allStudents = useDocenteStore((state) => state.students);
   const students = React.useMemo(() =>
-    allStudents.filter((s) => s.groupId === groupId),
+    allStudents.filter((s) => s.groupId === groupId).sort((a, b) => a.name.localeCompare(b.name)),
     [allStudents, groupId]
   );
   const allCategories = useDocenteStore((state) => state.categories);

@@ -125,7 +125,6 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
           <table className="w-full text-left border-collapse min-w-[300px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
-                <th className="p-3 w-20 hidden sm:table-cell">Matrícula</th>
                 <th className="p-3">Alumno</th>
                 <th className="p-3 text-center w-24">Asistió</th>
               </tr>
@@ -133,16 +132,14 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
             <tbody className="text-sm divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-slate-500">No se encontraron alumnos.</td>
+                  <td colSpan={2} className="p-8 text-center text-slate-500">No se encontraron alumnos.</td>
                 </tr>
               ) : (
                 filteredStudents.map((s) => {
                   const status = getStatus(s.id);
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition">
-                      <td className="p-3 font-mono text-xs text-slate-500 hidden sm:table-cell">{s.matricula}</td>
                       <td className="p-3 font-medium text-slate-800 text-xs sm:text-sm">
-                        <div className="sm:hidden text-[10px] text-slate-400 font-mono mb-0.5">{s.matricula}</div>
                         {s.name}
                       </td>
                       <td className="p-3">

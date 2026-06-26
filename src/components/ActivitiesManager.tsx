@@ -7,7 +7,7 @@ import { getMexicoCityDateString } from "../lib/dateUtils";
 export default function ActivitiesManager({ groupId }: { groupId: string }) {
   const categories = useDocenteStore(state => state.categories).filter(c => c.groupId === groupId);
   const activities = useDocenteStore(state => state.activities).filter(a => a.groupId === groupId);
-  const students = useDocenteStore(state => state.students).filter(s => s.groupId === groupId);
+  const students = useDocenteStore(state => state.students).filter(s => s.groupId === groupId).sort((a,b) => a.name.localeCompare(b.name));
   const teams = useDocenteStore(state => state.teams).filter(t => t.groupId === groupId);
   const allGrades = useDocenteStore(state => state.grades);
   const createActivity = useDocenteStore(state => state.createActivity);
@@ -219,7 +219,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 mt-2">
-                  <div className="flex items-center gap-1.5"><CalendarIcon date={act.date} /> {new Date(act.date).toLocaleDateString()}</div>
+                  <div className="flex items-center gap-1.5"><CalendarIcon date={act.date} /> {act.date}</div>
                   <div className="flex items-center gap-1.5">
                     {act.isTeamActivity ? <Users className="w-3.5 h-3.5 text-blue-500"/> : <Target className="w-3.5 h-3.5 text-slate-400"/>}
                     {act.isTeamActivity ? "Por Equipos" : "Individual"}
@@ -293,7 +293,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
             </p>
             
             <div className="flex-1 overflow-x-auto overflow-y-auto border rounded-lg mb-4">
-              <table className="w-full text-sm text-left min-w-[350px]">
+              <table className="w-full text-sm text-left min-w-[280px]">
                 <thead className="bg-slate-50 border-b sticky top-0">
                   <tr>
                     <th className="p-3 text-slate-500 font-bold">{gradingActivity.isTeamActivity ? "Equipo" : "Alumno"}</th>
@@ -325,7 +325,6 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
                       <tr key={s.id} className="hover:bg-slate-50">
                         <td className="p-3 font-semibold text-slate-800">
                           {s.name}
-                          <div className="text-[10px] font-mono text-slate-400 font-normal">{s.matricula}</div>
                         </td>
                         <td className="p-3 text-right">
                           <GradeInput type={gradingActivity.type} val={capturedScores[s.id]} setVal={(v: any) => setCapturedScores(prev => ({...prev, [s.id]: v}))} max={gradingActivity.totalWorks} />
@@ -363,13 +362,32 @@ function GradeInput({ type, val, setVal, max }: { type: ActivityType, val: any, 
   }
   if (type === 'total') {
     return (
-      <div className="flex items-center justify-end gap-2">
-        <input type="number" min="0" max={max} value={val} onChange={e => setVal(e.target.value)} className="w-16 border rounded p-1 text-center text-sm" />
-        <span className="text-xs text-slate-400 font-medium">/ {max}</span>
+      <div className="flex items-center justify-end w-full gap-2">
+        <input 
+          type="number" 
+          min="0" 
+          max={max} 
+          value={val} 
+          onChange={e => setVal(e.target.value)} 
+          className="w-16 sm:w-20 border border-slate-200 rounded-lg p-2 text-center text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none" 
+        />
+        <span className="text-xs sm:text-sm text-slate-400 font-bold">/ {max}</span>
       </div>
     )
   }
-  return <input type="number" min="0" max="100" value={val} onChange={e => setVal(e.target.value)} className="w-20 border rounded p-1 text-center text-sm" placeholder="0-100" />
+  return (
+    <div className="flex justify-end w-full">
+      <input 
+        type="number" 
+        min="0" 
+        max="100" 
+        value={val} 
+        onChange={e => setVal(e.target.value)} 
+        className="w-20 sm:w-24 border border-slate-200 rounded-lg p-2 text-center text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none" 
+        placeholder="0-100" 
+      />
+    </div>
+  );
 }
 
 function CalendarIcon({ date }: { date: string }) {

@@ -4,7 +4,7 @@ import { Users, Shuffle, Plus, Trash2, X } from "lucide-react";
 import { Student } from "../types";
 
 export default function TeamsManager({ groupId }: { groupId: string }) {
-  const students = useDocenteStore(state => state.students).filter(s => s.groupId === groupId);
+  const students = useDocenteStore(state => state.students).filter(s => s.groupId === groupId).sort((a,b) => a.name.localeCompare(b.name));
   const teams = useDocenteStore(state => state.teams).filter(t => t.groupId === groupId);
   const createTeam = useDocenteStore(state => state.createTeam);
   const deleteTeam = useDocenteStore(state => state.deleteTeam);

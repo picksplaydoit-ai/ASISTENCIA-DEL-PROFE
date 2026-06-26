@@ -114,10 +114,14 @@ interface DocenteState {
 
 // Helper to generate access code
 export function generateAccessCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const numbers = "0123456789";
   let result = "";
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 2; i++) {
+    result += letters.charAt(Math.floor(Math.random() * letters.length));
+  }
+  for (let i = 0; i < 2; i++) {
+    result += numbers.charAt(Math.floor(Math.random() * numbers.length));
   }
   return result;
 }
