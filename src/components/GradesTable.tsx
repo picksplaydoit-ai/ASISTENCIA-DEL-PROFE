@@ -105,7 +105,8 @@ export function calculateStudentGrades(
 export default function GradesTable({ groupId }: GradesTableProps) {
   const groups = useDocenteStore((state) => state.groups);
   const group = groups.find(g => g.id === groupId);
-  const attendances = useDocenteStore((state) => state.attendances).filter(a => a.groupId === groupId);
+  const allAttendances = useDocenteStore((state) => state.attendances);
+  const attendances = React.useMemo(() => allAttendances.filter(a => a.groupId === groupId), [allAttendances, groupId]);
   
   const allStudents = useDocenteStore((state) => state.students);
   const students = React.useMemo(() =>
@@ -117,7 +118,8 @@ export default function GradesTable({ groupId }: GradesTableProps) {
     allCategories.filter((c) => c.groupId === groupId),
     [allCategories, groupId]
   );
-  const activities = useDocenteStore((state) => state.activities).filter(a => a.groupId === groupId);
+  const allActivities = useDocenteStore((state) => state.activities);
+  const activities = React.useMemo(() => allActivities.filter(a => a.groupId === groupId), [allActivities, groupId]);
   const grades = useDocenteStore((state) => state.grades);
   const saveGrade = useDocenteStore((state) => state.saveGrade);
   const updateStudentOverride = useDocenteStore((state) => state.updateStudentOverride);
@@ -133,22 +135,22 @@ export default function GradesTable({ groupId }: GradesTableProps) {
   const [activitiesCategory, setActivitiesCategory] = useState<string>(categories[0]?.id || "");
 
   // Derived Attendance Data
-  const availableMonths = Array.from(new Set(attendances.map(a => a.date.substring(0, 7)))).sort().reverse();
-  const filteredAttendances = attendances.filter(a => attendanceMonth === "all" || a.date.startsWith(attendanceMonth));
-  const uniqueDates = Array.from(new Set(filteredAttendances.map(a => a.date))).sort();
+  const availableMonths = React.useMemo(() => Array.from(new Set(attendances.map(a => a.date.substring(0, 7)))).sort().reverse(), [attendances]);
+  const filteredAttendances = React.useMemo(() => attendances.filter(a => attendanceMonth === "all" || a.date.startsWith(attendanceMonth)), [attendances, attendanceMonth]);
+  const uniqueDates = React.useMemo(() => Array.from(new Set(filteredAttendances.map(a => a.date))).sort(), [filteredAttendances]);
 
   // Derived Activities Data
-  const filteredActivities = activities.filter(a => a.categoryId === activitiesCategory);
+  const filteredActivities = React.useMemo(() => activities.filter(a => a.categoryId === activitiesCategory), [activities, activitiesCategory]);
 
-  const totalPercentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
+  const totalPercentage = React.useMemo(() => categories.reduce((sum, cat) => sum + cat.percentage, 0), [categories]);
 
   // Group metrics
-  const groupResults = students.map(s => calculateStudentGrades(s, categories, grades, attendances, group?.requiredAttendancePercentage || 0, activities));
+  const groupResults = React.useMemo(() => students.map(s => calculateStudentGrades(s, categories, grades, attendances, group?.requiredAttendancePercentage || 0, activities)), [students, categories, grades, attendances, group?.requiredAttendancePercentage, activities]);
   
   const totalStudents = students.length;
-  const approvedCount = groupResults.filter(r => r.statusText === "Aprobado").length;
-  const failedCount = groupResults.filter(r => r.statusText === "Reprobado").length;
-  const sdCount = groupResults.filter(r => r.statusText === "SD").length;
+  const approvedCount = React.useMemo(() => groupResults.filter(r => r.statusText === "Aprobado").length, [groupResults]);
+  const failedCount = React.useMemo(() => groupResults.filter(r => r.statusText === "Reprobado").length, [groupResults]);
+  const sdCount = React.useMemo(() => groupResults.filter(r => r.statusText === "SD").length, [groupResults]);
   
   const avgFinalGrade = totalStudents > 0 
     ? (groupResults.reduce((acc, r) => acc + r.finalGrade, 0) / totalStudents).toFixed(1)

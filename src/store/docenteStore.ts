@@ -964,6 +964,16 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       date: getMexicoCityDateString(),
     };
 
+    set((state) => {
+      let updated;
+      if (existingGrade) {
+        updated = state.grades.map((g) => (g.id === gradeId ? gradeObj : g));
+      } else {
+        updated = [...state.grades, gradeObj];
+      }
+      return { grades: updated };
+    });
+
     if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "grades", gradeId), gradeObj);
@@ -971,20 +981,15 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error saving grade:", e);
       }
     } else {
-      set((state) => {
-        let updated;
-        if (existingGrade) {
-          updated = state.grades.map((g) => (g.id === gradeId ? gradeObj : g));
-        } else {
-          updated = [...state.grades, gradeObj];
-        }
-        setTimeout(() => get().saveLocalData(), 0);
-        return { grades: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
   deleteGrade: async (gradeId) => {
+    set((state) => {
+      const updated = state.grades.filter((g) => g.id !== gradeId);
+      return { grades: updated };
+    });
     if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "grades", gradeId));
@@ -992,11 +997,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error deleting grade:", e);
       }
     } else {
-      set((state) => {
-        const updated = state.grades.filter((g) => g.id !== gradeId);
-        setTimeout(() => get().saveLocalData(), 0);
-        return { grades: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
@@ -1012,32 +1013,43 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       isTeamActivity,
       date,
     };
+    set((state) => ({ activities: [...state.activities, newActivity] }));
     if (!isLocalStorageFallback && db) {
-      await setDoc(doc(db, "activities", newActivity.id), newActivity);
+      try {
+        await setDoc(doc(db, "activities", newActivity.id), newActivity);
+      } catch (e) {
+        console.error("Error creating activity:", e);
+      }
     } else {
-      set((state) => ({ activities: [...state.activities, newActivity] }));
       setTimeout(() => get().saveLocalData(), 0);
     }
   },
   updateActivity: async (activityId, name, type, totalWorks, isTeamActivity, date) => {
+    set((state) => ({
+      activities: state.activities.map((a) => (a.id === activityId ? { ...a, name, type, totalWorks, isTeamActivity, date } : a)),
+    }));
     if (!isLocalStorageFallback && db) {
-      await setDoc(doc(db, "activities", activityId), { name, type, totalWorks, isTeamActivity, date }, { merge: true });
+      try {
+        await setDoc(doc(db, "activities", activityId), { name, type, totalWorks, isTeamActivity, date }, { merge: true });
+      } catch (e) {
+        console.error("Error updating activity:", e);
+      }
     } else {
-      set((state) => ({
-        activities: state.activities.map((a) => (a.id === activityId ? { ...a, name, type, totalWorks, isTeamActivity, date } : a)),
-      }));
       setTimeout(() => get().saveLocalData(), 0);
     }
   },
   deleteActivity: async (activityId) => {
+    set((state) => ({ 
+      activities: state.activities.filter((a) => a.id !== activityId),
+      grades: state.grades.filter((g) => g.activityId !== activityId)
+    }));
     if (!isLocalStorageFallback && db) {
-      await deleteDoc(doc(db, "activities", activityId));
-      // Optionally delete related grades here in Firestore
+      try {
+        await deleteDoc(doc(db, "activities", activityId));
+      } catch (e) {
+        console.error("Error deleting activity:", e);
+      }
     } else {
-      set((state) => ({ 
-        activities: state.activities.filter((a) => a.id !== activityId),
-        grades: state.grades.filter((g) => g.activityId !== activityId)
-      }));
       setTimeout(() => get().saveLocalData(), 0);
     }
   },

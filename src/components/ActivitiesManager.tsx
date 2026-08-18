@@ -5,10 +5,17 @@ import { Plus, Edit2, Trash2, Search, Target, Users, BookOpen, Calculator, Check
 import { getMexicoCityDateString } from "../lib/dateUtils";
 
 export default function ActivitiesManager({ groupId }: { groupId: string }) {
-  const categories = useDocenteStore(state => state.categories).filter(c => c.groupId === groupId);
-  const activities = useDocenteStore(state => state.activities).filter(a => a.groupId === groupId);
-  const students = useDocenteStore(state => state.students).filter(s => s.groupId === groupId).sort((a,b) => a.name.localeCompare(b.name));
-  const teams = useDocenteStore(state => state.teams).filter(t => t.groupId === groupId);
+  const allCategories = useDocenteStore(state => state.categories);
+  const categories = React.useMemo(() => allCategories.filter(c => c.groupId === groupId), [allCategories, groupId]);
+  
+  const allActivities = useDocenteStore(state => state.activities);
+  const activities = React.useMemo(() => allActivities.filter(a => a.groupId === groupId), [allActivities, groupId]);
+  
+  const allStudents = useDocenteStore(state => state.students);
+  const students = React.useMemo(() => allStudents.filter(s => s.groupId === groupId).sort((a,b) => a.name.localeCompare(b.name)), [allStudents, groupId]);
+  
+  const allTeams = useDocenteStore(state => state.teams);
+  const teams = React.useMemo(() => allTeams.filter(t => t.groupId === groupId), [allTeams, groupId]);
   const allGrades = useDocenteStore(state => state.grades);
   const createActivity = useDocenteStore(state => state.createActivity);
   const updateActivity = useDocenteStore(state => state.updateActivity);
@@ -138,19 +145,21 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
       );
     };
 
+    const promises: Promise<void>[] = [];
     if (gradingActivity.isTeamActivity) {
       for (const t of teams) {
         const val = capturedScores[t.id];
         for (const sId of t.studentIds) {
-          await saveForStudent(sId, val);
+          promises.push(saveForStudent(sId, val));
         }
       }
     } else {
       for (const s of students) {
         const val = capturedScores[s.id];
-        await saveForStudent(s.id, val);
+        promises.push(saveForStudent(s.id, val));
       }
     }
+    await Promise.all(promises);
     setGradingActivity(null);
   };
 
