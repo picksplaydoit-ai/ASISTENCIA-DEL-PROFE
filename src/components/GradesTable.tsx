@@ -22,7 +22,17 @@ export function calculateStudentGrades(
   requiredAttendancePct: number = 0,
   activities: Activity[] = []
 ) {
-  const studentGrades = grades.filter((g) => g.studentId === student.id);
+  const validActivityMap = new Map<string, Activity>(activities.map((a) => [a.id, a]));
+
+  const studentGrades = grades.filter((g) => {
+    if (g.studentId !== student.id) return false;
+    // Exclude grades from deleted activities
+    if (g.activityId && !validActivityMap.has(g.activityId)) {
+      return false;
+    }
+    return true;
+  });
+
   const categoryAverages: { [catId: string]: { avg: number; count: number } } = {};
 
   categories.forEach((cat) => {
@@ -30,9 +40,18 @@ export function calculateStudentGrades(
   });
 
   studentGrades.forEach((g) => {
-    if (categoryAverages[g.categoryId]) {
-      categoryAverages[g.categoryId].avg += g.grade;
-      categoryAverages[g.categoryId].count += 1;
+    // If the grade is tied to an activity, use the activity's current category as source of truth
+    let targetCatId = g.categoryId;
+    if (g.activityId) {
+      const act = validActivityMap.get(g.activityId);
+      if (act && act.categoryId) {
+        targetCatId = act.categoryId;
+      }
+    }
+
+    if (categoryAverages[targetCatId]) {
+      categoryAverages[targetCatId].avg += g.grade || 0;
+      categoryAverages[targetCatId].count += 1;
     }
   });
 
@@ -41,7 +60,7 @@ export function calculateStudentGrades(
 
   categories.forEach((cat) => {
     const data = categoryAverages[cat.id];
-    const hasActivities = activities.some(a => a.categoryId === cat.id);
+    const hasActivities = activities.some((a) => a.categoryId === cat.id);
     
     if (data.count > 0) {
       const avg = data.avg / data.count;
@@ -198,13 +217,20 @@ export default function GradesTable({ groupId }: GradesTableProps) {
     const wsAttendance = XLSX.utils.json_to_sheet(attendanceData);
     
     const activitiesData: any[] = [];
+    const validActivitiesMap = new Map<string, Activity>(activities.map(a => [a.id, a]));
     students.forEach(student => {
-      grades.filter(g => g.studentId === student.id).forEach(g => {
+      grades.filter(g => {
+        if (g.studentId !== student.id) return false;
+        if (g.activityId && !validActivitiesMap.has(g.activityId)) return false;
+        return true;
+      }).forEach(g => {
+        const act = g.activityId ? validActivitiesMap.get(g.activityId) : undefined;
+        const catId = act?.categoryId || g.categoryId;
         activitiesData.push({
           Matrícula: student.matricula,
           Alumno: student.name,
-          Actividad: g.activityName,
-          Categoría: categories.find(c => c.id === g.categoryId)?.name || 'Sin Categoría',
+          Actividad: act?.name || g.activityName,
+          Categoría: categories.find(c => c.id === catId)?.name || 'Sin Categoría',
           Fecha: g.date,
           Calificación: g.grade,
         });
@@ -339,8 +365,8 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((student) => {
-                  const results = calculateStudentGrades(student, categories, grades, attendances, group?.requiredAttendancePercentage || 0, activities);
+                {students.map((student, studentIdx) => {
+                  const results = groupResults[studentIdx] || calculateStudentGrades(student, categories, grades, attendances, group?.requiredAttendancePercentage || 0, activities);
                   return (
                     <tr key={student.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-4 py-3 font-mono font-medium text-slate-500">{student.matricula}</td>

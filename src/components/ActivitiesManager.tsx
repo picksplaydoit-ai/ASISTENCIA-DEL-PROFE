@@ -45,7 +45,7 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
     e.preventDefault();
     if (!name || !categoryId) return;
     if (editingActivityId) {
-      await updateActivity(editingActivityId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
+      await updateActivity(editingActivityId, categoryId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
     } else {
       await createActivity(groupId, categoryId, name, type, type === "total" ? totalWorks : 0, isTeamActivity, date);
     }
@@ -221,7 +221,15 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
                     <button onClick={() => openGrading(act)} className="px-3 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-xs font-semibold rounded transition">
                       Calificar
                     </button>
-                    <button onClick={() => deleteActivity(act.id)} className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-md transition">
+                    <button 
+                      onClick={() => {
+                        if (confirm(`¿Estás seguro de eliminar la actividad "${act.name}"? Se borrarán también sus calificaciones registradas.`)) {
+                          deleteActivity(act.id);
+                        }
+                      }} 
+                      className="p-1.5 text-rose-400 hover:bg-rose-50 rounded-md transition"
+                      title="Eliminar actividad"
+                    >
                       <Trash2 className="w-4 h-4"/>
                     </button>
                   </div>

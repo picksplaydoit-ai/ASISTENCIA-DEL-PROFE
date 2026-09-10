@@ -90,7 +90,7 @@ interface DocenteState {
 
   // Activity CRUD
   createActivity: (groupId: string, categoryId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
-  updateActivity: (activityId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
+  updateActivity: (activityId: string, categoryId: string, name: string, type: "numeric"|"boolean"|"total", totalWorks: number, isTeamActivity: boolean, date: string) => Promise<void>;
   deleteActivity: (activityId: string) => Promise<void>;
   deleteAllActivities: (groupId: string) => Promise<void>;
 
@@ -914,30 +914,49 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteCategory: async (categoryId) => {
+    set((state) => {
+      const actIdsToRemove = new Set(state.activities.filter(a => a.categoryId === categoryId).map(a => a.id));
+      return {
+        categories: state.categories.filter((c) => c.id !== categoryId),
+        activities: state.activities.filter((a) => a.categoryId !== categoryId),
+        grades: state.grades.filter((g) => g.categoryId !== categoryId && (!g.activityId || !actIdsToRemove.has(g.activityId))),
+      };
+    });
+
     if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "categories", categoryId));
+
+        // Delete activities belonging to this category
+        const qAct = query(collection(db, "activities"), where("categoryId", "==", categoryId));
+        const snapAct = await getDocs(qAct);
+        const batch = writeBatch(db);
+        const actIds: string[] = [];
+        snapAct.forEach((d) => {
+          actIds.push(d.id);
+          batch.delete(doc(db, "activities", d.id));
+        });
+
         // Clean up grades for this category
         const q = query(collection(db, "grades"), where("categoryId", "==", categoryId));
         const snapshot = await getDocs(q);
-        const batch = writeBatch(db);
         snapshot.forEach((d) => {
           batch.delete(doc(db, "grades", d.id));
         });
+
+        // Clean up any grades with matching activityIds
+        for (const aId of actIds) {
+          const qGrades = query(collection(db, "grades"), where("activityId", "==", aId));
+          const snapGrades = await getDocs(qGrades);
+          snapGrades.forEach(d => batch.delete(doc(db, "grades", d.id)));
+        }
+
         await batch.commit();
       } catch (e) {
         console.error("Error deleting category:", e);
       }
     } else {
-      set((state) => {
-        const updatedCats = state.categories.filter((c) => c.id !== categoryId);
-        const updatedGrades = state.grades.filter((g) => g.categoryId !== categoryId);
-        setTimeout(() => get().saveLocalData(), 0);
-        return {
-          categories: updatedCats,
-          grades: updatedGrades,
-        };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
@@ -1024,13 +1043,29 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       setTimeout(() => get().saveLocalData(), 0);
     }
   },
-  updateActivity: async (activityId, name, type, totalWorks, isTeamActivity, date) => {
+  updateActivity: async (activityId, categoryId, name, type, totalWorks, isTeamActivity, date) => {
     set((state) => ({
-      activities: state.activities.map((a) => (a.id === activityId ? { ...a, name, type, totalWorks, isTeamActivity, date } : a)),
+      activities: state.activities.map((a) =>
+        a.id === activityId ? { ...a, categoryId, name, type, totalWorks, isTeamActivity, date } : a
+      ),
+      grades: state.grades.map((g) =>
+        g.activityId === activityId ? { ...g, categoryId, activityName: name } : g
+      ),
     }));
     if (!isLocalStorageFallback && db) {
       try {
-        await setDoc(doc(db, "activities", activityId), { name, type, totalWorks, isTeamActivity, date }, { merge: true });
+        await setDoc(doc(db, "activities", activityId), { categoryId, name, type, totalWorks, isTeamActivity, date }, { merge: true });
+        
+        // Sync categoryId and name to all grades belonging to this activity
+        const qGrades = query(collection(db, "grades"), where("activityId", "==", activityId));
+        const snapGrades = await getDocs(qGrades);
+        if (!snapGrades.empty) {
+          const batch = writeBatch(db);
+          snapGrades.forEach((d) => {
+            batch.update(doc(db, "grades", d.id), { categoryId, activityName: name });
+          });
+          await batch.commit();
+        }
       } catch (e) {
         console.error("Error updating activity:", e);
       }
@@ -1046,6 +1081,16 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
     if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "activities", activityId));
+        // Delete all related grades in Firestore
+        const qGrades = query(collection(db, "grades"), where("activityId", "==", activityId));
+        const snapGrades = await getDocs(qGrades);
+        if (!snapGrades.empty) {
+          const batch = writeBatch(db);
+          snapGrades.forEach((d) => {
+            batch.delete(doc(db, "grades", d.id));
+          });
+          await batch.commit();
+        }
       } catch (e) {
         console.error("Error deleting activity:", e);
       }

@@ -297,7 +297,16 @@ export default function StudentPortal() {
           ) : (
             <div className="space-y-6">
               {activeStudentCategories.map((cat) => {
-                const catGrades = activeStudentGrades.filter((g) => g.categoryId === cat.id);
+                const validActivityIds = new Set(activeStudentActivities.map((a) => a.id));
+                const catGrades = activeStudentGrades.filter((g) => {
+                  if (g.activityId && !validActivityIds.has(g.activityId)) return false;
+                  let targetCatId = g.categoryId;
+                  if (g.activityId) {
+                    const act = activeStudentActivities.find((a) => a.id === g.activityId);
+                    if (act?.categoryId) targetCatId = act.categoryId;
+                  }
+                  return targetCatId === cat.id;
+                });
                 const catResults = results.categoryAverages[cat.id];
                 const avgScore = catResults?.avg || 0;
                 const count = catResults?.count || 0;
@@ -325,17 +334,20 @@ export default function StudentPortal() {
                       </div>
                     ) : (
                       <div className="divide-y divide-slate-50">
-                        {catGrades.map((grade) => (
-                          <div key={grade.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition text-sm">
-                            <div>
-                              <div className="font-semibold text-slate-700">{grade.activityName}</div>
-                              <div className="text-[10px] text-slate-400">Fecha: {grade.date}</div>
+                        {catGrades.map((grade) => {
+                          const act = grade.activityId ? activeStudentActivities.find((a) => a.id === grade.activityId) : undefined;
+                          return (
+                            <div key={grade.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50/50 transition text-sm">
+                              <div>
+                                <div className="font-semibold text-slate-700">{act?.name || grade.activityName}</div>
+                                <div className="text-[10px] text-slate-400">Fecha: {act?.date || grade.date}</div>
+                              </div>
+                              <div className="font-bold text-slate-800 bg-white px-3 py-1 rounded border border-slate-200 shadow-sm font-mono text-xs">
+                                {grade.grade} <span className="text-[9px] text-slate-400 font-normal">/100</span>
+                              </div>
                             </div>
-                            <div className="font-bold text-slate-800 bg-white px-3 py-1 rounded border border-slate-200 shadow-sm font-mono text-xs">
-                              {grade.grade} <span className="text-[9px] text-slate-400 font-normal">/100</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
