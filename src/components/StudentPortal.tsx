@@ -251,14 +251,25 @@ export default function StudentPortal() {
 
             {/* Attendance Card */}
             <div className={`border rounded-2xl p-6 shadow-sm flex flex-col justify-between h-44 ${
+              results.totalClasses === 0 ? "bg-slate-50 border-slate-100" :
               results.hasDerecho ? "bg-blue-50/50 border-blue-100" : "bg-rose-50/50 border-rose-100"
             }`}>
               <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Asistencias</div>
               <div className="my-2 flex items-baseline gap-2">
-                <span className={`text-5xl font-black tracking-tight ${results.hasDerecho ? "text-blue-800" : "text-rose-800"}`}>{results.attendancePct}%</span>
+                <span className={`text-5xl font-black tracking-tight ${
+                  results.totalClasses === 0 ? "text-slate-400" :
+                  results.hasDerecho ? "text-blue-800" : "text-rose-800"
+                }`}>
+                  {results.totalClasses === 0 ? "—" : `${results.attendancePct}%`}
+                </span>
+                {results.totalClasses > 0 && (
+                  <span className="text-xs text-slate-500 font-medium">({results.presentClasses}/{results.totalClasses})</span>
+                )}
               </div>
               <div className="text-xs text-slate-500">
-                Mínimo requerido: <span className="font-bold">{activeStudentGroup?.requiredAttendancePercentage}%</span>
+                {results.totalClasses === 0
+                  ? "Sin sesiones registradas aún"
+                  : <>Mínimo requerido: <span className="font-bold">{activeStudentGroup?.requiredAttendancePercentage || 80}%</span></>}
               </div>
             </div>
           </div>

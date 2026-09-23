@@ -25,11 +25,18 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
 
   const markAttendance = useDocenteStore((state) => state.markAttendance);
   const [records, setRecords] = useState<Record<string, boolean | "present" | "absent" | "justified">>({});
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Sync state with store
   React.useEffect(() => {
-    if (attendanceRecord) {
-      setRecords(attendanceRecord.records);
+    if (attendanceRecord && attendanceRecord.records) {
+      const merged: Record<string, boolean | "present" | "absent" | "justified"> = { ...attendanceRecord.records };
+      students.forEach(s => {
+        if (merged[s.id] === undefined) {
+          merged[s.id] = "present";
+        }
+      });
+      setRecords(merged);
     } else {
       // By default everyone present
       const initial: Record<string, "present"> = {};
@@ -51,12 +58,14 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
 
   const handleSave = async () => {
     await markAttendance(groupId, date, records);
-    alert("Asistencia guardada exitosamente.");
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2500);
   };
 
   const filteredStudents = students.filter(s => s.name.toLowerCase().includes(search.toLowerCase()) || s.matricula.includes(search));
 
   const presentCount = students.filter(s => getStatus(s.id) === "present").length;
+  const justifiedCount = students.filter(s => getStatus(s.id) === "justified").length;
   const absentCount = students.filter(s => getStatus(s.id) === "absent").length;
 
   return (
@@ -79,17 +88,25 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
               />
             </div>
             {/* Save button also here for desktop */}
-            <button onClick={handleSave} className="hidden sm:flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
+            <button onClick={handleSave} className="hidden sm:flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition active:scale-95">
               <Save className="w-4 h-4" />
               Guardar
             </button>
           </div>
         </div>
 
+        {saveSuccess && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-xs font-semibold animate-fade-in">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Asistencia guardada exitosamente para la fecha {date}.</span>
+          </div>
+        )}
+
         <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100 mb-6">
           <div className="flex flex-wrap items-center gap-3 text-sm font-medium">
             <span className="text-slate-600">Total: {students.length}</span>
             <span className="text-emerald-600 flex items-center gap-1"><Check className="w-4 h-4"/> Asis: {presentCount}</span>
+            <span className="text-amber-600 flex items-center gap-1"><Minus className="w-4 h-4"/> Justif: {justifiedCount}</span>
             <span className="text-rose-600 flex items-center gap-1"><X className="w-4 h-4"/> Faltas: {absentCount}</span>
             
             <div className="flex items-center gap-2 sm:border-l border-slate-200 sm:pl-4 mt-2 sm:mt-0">
@@ -126,7 +143,7 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
                 <th className="p-3">Alumno</th>
-                <th className="p-3 text-center w-24">Asistió</th>
+                <th className="p-3 text-center w-36">Estado de Asistencia</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-slate-100">
@@ -150,6 +167,13 @@ export default function AttendanceManager({ groupId }: AttendanceManagerProps) {
                             className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${status === 'present' ? 'bg-emerald-500 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
                           >
                             <Check className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => setStatus(s.id, "justified")}
+                            title="Falta Justificada"
+                            className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${status === 'justified' ? 'bg-amber-500 text-white shadow-md scale-110' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                          >
+                            <Minus className="w-5 h-5" />
                           </button>
                           <button 
                             onClick={() => setStatus(s.id, "absent")}

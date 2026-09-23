@@ -358,10 +358,13 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         if (groupIds.length > 0) {
           get().subscribeToGroupsSubData(groupIds);
         } else {
-          set({ students: [], categories: [], grades: [] });
+          set({ students: [], categories: [], grades: [], activities: [], attendances: [], teams: [] });
           if (studentsUnsubscribe) { studentsUnsubscribe(); studentsUnsubscribe = null; }
           if (categoriesUnsubscribe) { categoriesUnsubscribe(); categoriesUnsubscribe = null; }
           if (gradesUnsubscribe) { gradesUnsubscribe(); gradesUnsubscribe = null; }
+          if (activitiesUnsubscribe) { activitiesUnsubscribe(); activitiesUnsubscribe = null; }
+          if (attendancesUnsubscribe) { attendancesUnsubscribe(); attendancesUnsubscribe = null; }
+          if (teamsUnsubscribe) { teamsUnsubscribe(); teamsUnsubscribe = null; }
           lastSubscribedGroupIds = [];
         }
       }, (error) => {
@@ -630,6 +633,9 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       students: [],
       categories: [],
       grades: [],
+      activities: [],
+      attendances: [],
+      teams: [],
       activeGroupId: null,
       currentView: "landing",
     });
@@ -646,8 +652,13 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       teacherId: teacher.uid,
       name,
       schoolYear,
+      requiredAttendancePercentage: 80,
       createdAt: new Date().toISOString(),
     };
+
+    set((state) => ({
+      groups: [newGroup, ...state.groups]
+    }));
 
     if (!isLocalStorageFallback && db) {
       try {
@@ -656,15 +667,24 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error creating group in Firestore:", e);
       }
     } else {
-      set((state) => {
-        const updated = [newGroup, ...state.groups];
-        setTimeout(() => get().saveLocalData(), 0);
-        return { groups: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
   updateGroup: async (groupId, name, schoolYear, requiredAttendancePercentage) => {
+    set((state) => ({
+      groups: state.groups.map((g) => {
+        if (g.id === groupId) {
+          const up: Group = { ...g, name, schoolYear };
+          if (requiredAttendancePercentage !== undefined) {
+            up.requiredAttendancePercentage = requiredAttendancePercentage;
+          }
+          return up;
+        }
+        return g;
+      })
+    }));
+
     if (!isLocalStorageFallback && db) {
       try {
         const updateData: any = { name, schoolYear };
@@ -676,24 +696,25 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error updating group in Firestore:", e);
       }
     } else {
-      set((state) => {
-        const updated = state.groups.map((g) => {
-          if (g.id === groupId) {
-            const up: Group = { ...g, name, schoolYear };
-            if (requiredAttendancePercentage !== undefined) {
-              up.requiredAttendancePercentage = requiredAttendancePercentage;
-            }
-            return up;
-          }
-          return g;
-        });
-        setTimeout(() => get().saveLocalData(), 0);
-        return { groups: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
   deleteGroup: async (groupId) => {
+    set((state) => {
+      const studentIds = new Set(state.students.filter((s) => s.groupId === groupId).map((s) => s.id));
+      return {
+        groups: state.groups.filter((g) => g.id !== groupId),
+        students: state.students.filter((s) => s.groupId !== groupId),
+        categories: state.categories.filter((c) => c.groupId !== groupId),
+        grades: state.grades.filter((g) => !studentIds.has(g.studentId)),
+        activities: state.activities.filter((a) => a.groupId !== groupId),
+        attendances: state.attendances.filter((a) => a.groupId !== groupId),
+        teams: state.teams.filter((t) => t.groupId !== groupId),
+        activeGroupId: state.activeGroupId === groupId ? null : state.activeGroupId,
+      };
+    });
+
     if (!isLocalStorageFallback && db) {
       try {
         // 1. Query students in the group
@@ -720,7 +741,28 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
           batch.delete(catDoc.ref);
         });
 
-        // 4. Delete the group document
+        // 4. Query and delete activities
+        const activitiesQuery = query(collection(db, "activities"), where("groupId", "==", groupId));
+        const activitiesSnap = await getDocs(activitiesQuery);
+        activitiesSnap.forEach((actDoc) => {
+          batch.delete(actDoc.ref);
+        });
+
+        // 5. Query and delete attendances
+        const attendancesQuery = query(collection(db, "attendances"), where("groupId", "==", groupId));
+        const attendancesSnap = await getDocs(attendancesQuery);
+        attendancesSnap.forEach((attDoc) => {
+          batch.delete(attDoc.ref);
+        });
+
+        // 6. Query and delete teams
+        const teamsQuery = query(collection(db, "teams"), where("groupId", "==", groupId));
+        const teamsSnap = await getDocs(teamsQuery);
+        teamsSnap.forEach((tDoc) => {
+          batch.delete(tDoc.ref);
+        });
+
+        // 7. Delete the group document
         batch.delete(doc(db, "groups", groupId));
 
         // Commit batch
@@ -729,26 +771,9 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error deleting group from Firestore:", e);
       }
     } else {
-      set((state) => {
-        const updatedGroups = state.groups.filter((g) => g.id !== groupId);
-        const updatedStudents = state.students.filter((s) => s.groupId !== groupId);
-        const updatedCategories = state.categories.filter((c) => c.groupId !== groupId);
-        // Clean up grades for deleted students
-        const studentIds = state.students.filter((s) => s.groupId === groupId).map((s) => s.id);
-        const updatedGrades = state.grades.filter((g) => !studentIds.includes(g.studentId));
-
-        setTimeout(() => {
-          get().saveLocalData();
-        }, 0);
-
-        return {
-          groups: updatedGroups,
-          students: updatedStudents,
-          categories: updatedCategories,
-          grades: updatedGrades,
-          activeGroupId: state.activeGroupId === groupId ? null : state.activeGroupId,
-        };
-      });
+      setTimeout(() => {
+        get().saveLocalData();
+      }, 0);
     }
   },
 
@@ -801,6 +826,11 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   deleteStudent: async (studentId) => {
+    set((state) => ({
+      students: state.students.filter((s) => s.id !== studentId),
+      grades: state.grades.filter((g) => g.studentId !== studentId),
+    }));
+
     if (!isLocalStorageFallback && db) {
       try {
         await deleteDoc(doc(db, "students", studentId));
@@ -816,19 +846,19 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error deleting student:", e);
       }
     } else {
-      set((state) => {
-        const updatedStudents = state.students.filter((s) => s.id !== studentId);
-        const updatedGrades = state.grades.filter((g) => g.studentId !== studentId);
-        setTimeout(() => get().saveLocalData(), 0);
-        return {
-          students: updatedStudents,
-          grades: updatedGrades,
-        };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
   deleteAllStudents: async (groupId) => {
+    set((state) => {
+      const studentIdsToRemove = new Set(state.students.filter(s => s.groupId === groupId).map(s => s.id));
+      return {
+        students: state.students.filter((s) => s.groupId !== groupId),
+        grades: state.grades.filter((g) => !studentIdsToRemove.has(g.studentId)),
+      };
+    });
+
     if (!isLocalStorageFallback && db) {
       try {
         const qStudents = query(collection(db, "students"), where("groupId", "==", groupId));
@@ -857,16 +887,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error deleting all students:", e);
       }
     } else {
-      set((state) => {
-        const studentIdsToRemove = new Set(state.students.filter(s => s.groupId === groupId).map(s => s.id));
-        const updatedStudents = state.students.filter((s) => s.groupId !== groupId);
-        const updatedGrades = state.grades.filter((g) => !studentIdsToRemove.has(g.studentId));
-        setTimeout(() => get().saveLocalData(), 0);
-        return {
-          students: updatedStudents,
-          grades: updatedGrades,
-        };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
@@ -880,6 +901,10 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       percentage,
     };
 
+    set((state) => ({
+      categories: [...state.categories, newCat]
+    }));
+
     if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "categories", id), newCat);
@@ -887,15 +912,17 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error creating category:", e);
       }
     } else {
-      set((state) => {
-        const updated = [...state.categories, newCat];
-        setTimeout(() => get().saveLocalData(), 0);
-        return { categories: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
   updateCategory: async (categoryId, name, percentage) => {
+    set((state) => ({
+      categories: state.categories.map((c) =>
+        c.id === categoryId ? { ...c, name, percentage } : c
+      )
+    }));
+
     if (!isLocalStorageFallback && db) {
       try {
         await setDoc(doc(db, "categories", categoryId), { name, percentage }, { merge: true });
@@ -903,13 +930,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         console.error("Error updating category:", e);
       }
     } else {
-      set((state) => {
-        const updated = state.categories.map((c) =>
-          c.id === categoryId ? { ...c, name, percentage } : c
-        );
-        setTimeout(() => get().saveLocalData(), 0);
-        return { categories: updated };
-      });
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
@@ -1171,23 +1192,25 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   // ATTENDANCE CRUD
   markAttendance: async (groupId, date, records) => {
     const existing = get().attendances.find((a) => a.groupId === groupId && a.date === date);
-    if (existing) {
-      if (!isLocalStorageFallback && db) {
-        await setDoc(doc(db, "attendances", existing.id), { records }, { merge: true });
-      } else {
-        set((state) => ({
-          attendances: state.attendances.map((a) => (a.id === existing.id ? { ...a, records } : a)),
-        }));
-        setTimeout(() => get().saveLocalData(), 0);
+    const attendanceId = existing ? existing.id : generateUUID();
+    const attendanceObj: Attendance = { id: attendanceId, groupId, date, records };
+
+    set((state) => {
+      const exists = state.attendances.some((a) => a.id === attendanceId || (a.groupId === groupId && a.date === date));
+      const updated = exists
+        ? state.attendances.map((a) => (a.id === attendanceId || (a.groupId === groupId && a.date === date)) ? attendanceObj : a)
+        : [...state.attendances, attendanceObj];
+      return { attendances: updated };
+    });
+
+    if (!isLocalStorageFallback && db) {
+      try {
+        await setDoc(doc(db, "attendances", attendanceId), attendanceObj);
+      } catch (e) {
+        console.error("Error saving attendance to Firestore:", e);
       }
     } else {
-      const newAttendance: Attendance = { id: generateUUID(), groupId, date, records };
-      if (!isLocalStorageFallback && db) {
-        await setDoc(doc(db, "attendances", newAttendance.id), newAttendance);
-      } else {
-        set((state) => ({ attendances: [...state.attendances, newAttendance] }));
-        setTimeout(() => get().saveLocalData(), 0);
-      }
+      setTimeout(() => get().saveLocalData(), 0);
     }
   },
 
@@ -1312,6 +1335,7 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
       activeStudentCategories: [],
       activeStudentGrades: [],
       activeStudentActivities: [],
+      activeStudentAttendances: [],
       currentView: "landing",
     });
   },

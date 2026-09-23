@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
 import { useDocenteStore } from "../store/docenteStore";
-import { Student, Category, Grade, Activity } from "../types";
+import { Student, Category, Grade, Activity, Attendance } from "../types";
 import { Save, HelpCircle, Edit3, ClipboardList, Check, TrendingUp, AlertCircle, LayoutDashboard, CalendarDays, Edit, X, Download, Minus } from "lucide-react";
 
 interface GradesTableProps {
@@ -82,18 +82,31 @@ export function calculateStudentGrades(
 
   const roundedGrade = Math.round(normalizedFinalGrade * 10) / 10;
   
+  // Deduplicate attendances by unique date
+  const uniqueAttendances: Attendance[] = [];
+  const seenDates = new Set<string>();
+  attendances.forEach((a) => {
+    if (a && a.date && !seenDates.has(a.date)) {
+      seenDates.add(a.date);
+      uniqueAttendances.push(a);
+    }
+  });
+
+  const totalClasses = uniqueAttendances.length;
   let hasDerecho = true;
   let attendancePct = 100;
-  
-  if (attendances.length > 0 && requiredAttendancePct > 0) {
-    const totalClasses = attendances.length;
-    
-    if (totalClasses > 0) {
-      const studentPresentCount = attendances.filter(a => {
-        const status = a.records && a.records[student.id];
-        return status === true || status === "present" || status === "justified";
-      }).length;
-      attendancePct = Math.round((studentPresentCount / totalClasses) * 100);
+  let presentClasses = 0;
+
+  if (totalClasses > 0) {
+    presentClasses = uniqueAttendances.filter((a) => {
+      const status = a.records && a.records[student.id];
+      return status === true || status === "present" || status === "justified";
+    }).length;
+
+    attendancePct = Math.round((presentClasses / totalClasses) * 100);
+
+    // Apply "Sin Derecho" condition if a minimum attendance percentage was configured (> 0)
+    if (requiredAttendancePct > 0) {
       hasDerecho = attendancePct >= requiredAttendancePct;
     }
   }
@@ -116,8 +129,10 @@ export function calculateStudentGrades(
     isPassed,
     hasDerecho,
     attendancePct,
+    presentClasses,
+    totalClasses,
     statusText,
-    isOverridden: student.manualFinalGrade !== undefined && student.manualFinalGrade !== null || !!student.manualStatus
+    isOverridden: (student.manualFinalGrade !== undefined && student.manualFinalGrade !== null) || !!student.manualStatus
   };
 }
 
@@ -154,8 +169,19 @@ export default function GradesTable({ groupId }: GradesTableProps) {
   const [activitiesCategory, setActivitiesCategory] = useState<string>(categories[0]?.id || "");
 
   // Derived Attendance Data
-  const availableMonths = React.useMemo(() => Array.from(new Set(attendances.map(a => a.date.substring(0, 7)))).sort().reverse(), [attendances]);
-  const filteredAttendances = React.useMemo(() => attendances.filter(a => attendanceMonth === "all" || a.date.startsWith(attendanceMonth)), [attendances, attendanceMonth]);
+  const uniqueGroupAttendances = React.useMemo(() => {
+    const map = new Map<string, Attendance>();
+    attendances.forEach((a) => {
+      if (a && a.date) {
+        map.set(a.date, a);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [attendances]);
+
+  const allGroupDates = React.useMemo(() => uniqueGroupAttendances.map(a => a.date), [uniqueGroupAttendances]);
+  const availableMonths = React.useMemo(() => Array.from(new Set(allGroupDates.map(d => d.substring(0, 7)))).sort().reverse(), [allGroupDates]);
+  const filteredAttendances = React.useMemo(() => uniqueGroupAttendances.filter(a => attendanceMonth === "all" || a.date.startsWith(attendanceMonth)), [uniqueGroupAttendances, attendanceMonth]);
   const uniqueDates = React.useMemo(() => Array.from(new Set(filteredAttendances.map(a => a.date))).sort(), [filteredAttendances]);
 
   // Derived Activities Data
@@ -164,7 +190,7 @@ export default function GradesTable({ groupId }: GradesTableProps) {
   const totalPercentage = React.useMemo(() => categories.reduce((sum, cat) => sum + cat.percentage, 0), [categories]);
 
   // Group metrics
-  const groupResults = React.useMemo(() => students.map(s => calculateStudentGrades(s, categories, grades, attendances, group?.requiredAttendancePercentage || 0, activities)), [students, categories, grades, attendances, group?.requiredAttendancePercentage, activities]);
+  const groupResults = React.useMemo(() => students.map(s => calculateStudentGrades(s, categories, grades, uniqueGroupAttendances, group?.requiredAttendancePercentage || 0, activities)), [students, categories, grades, uniqueGroupAttendances, group?.requiredAttendancePercentage, activities]);
   
   const totalStudents = students.length;
   const approvedCount = React.useMemo(() => groupResults.filter(r => r.statusText === "Aprobado").length, [groupResults]);
@@ -175,9 +201,13 @@ export default function GradesTable({ groupId }: GradesTableProps) {
     ? (groupResults.reduce((acc, r) => acc + r.finalGrade, 0) / totalStudents).toFixed(1)
     : "0";
     
-  const avgAttendance = totalStudents > 0
-    ? (groupResults.reduce((acc, r) => acc + r.attendancePct, 0) / totalStudents).toFixed(0)
-    : "0";
+  const avgAttendance = React.useMemo(() => {
+    if (totalStudents === 0 || allGroupDates.length === 0) return "0";
+    const totalPresent = groupResults.reduce((acc, r) => acc + (r.presentClasses || 0), 0);
+    const totalExpected = totalStudents * allGroupDates.length;
+    if (totalExpected === 0) return "0";
+    return Math.round((totalPresent / totalExpected) * 100).toString();
+  }, [totalStudents, allGroupDates.length, groupResults]);
 
   const exportToExcel = () => {
     const gradesData = groupResults.map((res, i) => {
@@ -312,7 +342,14 @@ export default function GradesTable({ groupId }: GradesTableProps) {
             </div>
             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
               <div className="text-emerald-600 text-xs font-bold uppercase tracking-wider mb-1">Asistencia Global</div>
-              <div className="text-3xl font-black text-emerald-900">{avgAttendance}%</div>
+              <div className="text-3xl font-black text-emerald-900">
+                {allGroupDates.length === 0 ? "—" : `${avgAttendance}%`}
+              </div>
+              <div className="text-[10px] font-semibold text-emerald-600/80 mt-1">
+                {allGroupDates.length === 0
+                  ? "Sin sesiones registradas"
+                  : `${allGroupDates.length} ${allGroupDates.length === 1 ? "sesión registrada" : "sesiones registradas"}`}
+              </div>
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
               <div className="text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">Aprobados</div>
@@ -392,8 +429,13 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                       })}
                       <td className="px-4 py-3 text-center">
                         <span className={`font-bold ${results.hasDerecho ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {results.attendancePct}%
+                          {allGroupDates.length === 0 ? "—" : `${results.attendancePct}%`}
                         </span>
+                        {allGroupDates.length > 0 && (
+                          <span className="block text-[10px] text-slate-400 font-medium">
+                            {results.presentClasses}/{results.totalClasses}
+                          </span>
+                        )}
                       </td>
                       <td 
                         className="px-4 py-3 text-center font-bold bg-indigo-50/10 text-indigo-700 text-sm cursor-pointer hover:bg-indigo-50"
@@ -526,7 +568,11 @@ export default function GradesTable({ groupId }: GradesTableProps) {
                       <td className="px-4 py-2.5 font-mono font-medium text-slate-500">{student.matricula}</td>
                       <td className="px-4 py-2.5 font-semibold text-slate-800 truncate max-w-[200px]" title={student.name}>{student.name}</td>
                       <td className="px-4 py-2.5 text-center font-bold bg-slate-50 border-x border-slate-100">
-                        <span className={pct >= (group?.requiredAttendancePercentage || 0) ? 'text-emerald-600' : 'text-rose-600'}>{pct}%</span>
+                        {totalDays === 0 ? (
+                          <span className="text-slate-400 font-normal">—</span>
+                        ) : (
+                          <span className={pct >= (group?.requiredAttendancePercentage || 0) ? 'text-emerald-600' : 'text-rose-600'}>{pct}%</span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-center font-bold text-emerald-600 bg-slate-50 border-x border-slate-100">
                         {presents} {justified > 0 && <span className="text-amber-500 text-[10px] ml-1" title="Justificadas">({justified})</span>}
