@@ -74,4 +74,6 @@ export interface Attendance {
   groupId: string;
   date: string;
   records: Record<string, boolean | "present" | "absent" | "justified">; // studentId -> status
+  notes?: Record<string, string>; // studentId -> observation/note for this date (e.g. "Evento deportivo", "Justificante médico")
+  dayObservation?: string; // Event or general note for the date (e.g. "Feria de Ciencias", "Día Inhábil", "Torneo")
 }

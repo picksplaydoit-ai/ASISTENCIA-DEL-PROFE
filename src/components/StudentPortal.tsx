@@ -260,7 +260,7 @@ export default function StudentPortal() {
                   results.totalClasses === 0 ? "text-slate-400" :
                   results.hasDerecho ? "text-blue-800" : "text-rose-800"
                 }`}>
-                  {results.totalClasses === 0 ? "—" : `${results.attendancePct}%`}
+                  {results.totalClasses === 0 ? "—" : `${results.attendancePct.toFixed(1)}%`}
                 </span>
                 {results.totalClasses > 0 && (
                   <span className="text-xs text-slate-500 font-medium">({results.presentClasses}/{results.totalClasses})</span>
@@ -384,13 +384,34 @@ export default function StudentPortal() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {activeStudentAttendances.sort((a, b) => b.date.localeCompare(a.date)).map((att) => {
                 const status = att.records ? att.records[activeStudent.id] : undefined;
+                const note = att.notes ? att.notes[activeStudent.id] : undefined;
                 return (
-                  <div key={att.id} className="border border-slate-100 rounded-lg p-3 text-center shadow-sm flex flex-col items-center">
-                    <span className="text-xs font-bold text-slate-600 mb-2">{att.date}</span>
-                    {(status === true || status === "present") && <Check className="w-5 h-5 text-emerald-500" title="Presente" />}
-                    {status === "absent" && <X className="w-5 h-5 text-rose-500" title="Falta" />}
-                    {status === "justified" && <Minus className="w-5 h-5 text-amber-500" title="Justificada" />}
-                    {status === undefined && <X className="w-5 h-5 text-rose-500" title="Falta (No Registrado)" />}
+                  <div key={att.id} className="border border-slate-100 rounded-lg p-3 text-center shadow-sm flex flex-col items-center justify-between min-h-[105px]">
+                    <div className="w-full flex flex-col items-center">
+                      <span className="text-xs font-bold text-slate-700">{att.date}</span>
+                      {att.dayObservation && (
+                        <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full font-medium truncate max-w-full mt-1" title={`Evento del día: ${att.dayObservation}`}>
+                          ✨ {att.dayObservation}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="my-1.5 flex items-center justify-center">
+                      {(status === true || status === "present") && <Check className="w-5 h-5 text-emerald-500" title="Presente" />}
+                      {status === "absent" && <X className="w-5 h-5 text-rose-500" title="Falta" />}
+                      {status === "justified" && <Minus className="w-5 h-5 text-amber-500" title="Justificada" />}
+                      {status === undefined && <X className="w-5 h-5 text-rose-500" title="Falta (No Registrado)" />}
+                    </div>
+
+                    {note ? (
+                      <span className="text-[10px] text-slate-600 bg-slate-50 border border-slate-200/60 px-1.5 py-0.5 rounded truncate max-w-full" title={`Nota: ${note}`}>
+                        📝 {note}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">
+                        {(status === true || status === "present") ? "Asistencia" : status === "justified" ? "Justificada" : "Inasistencia"}
+                      </span>
+                    )}
                   </div>
                 );
               })}

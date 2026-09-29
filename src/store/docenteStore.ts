@@ -100,7 +100,13 @@ interface DocenteState {
   deleteTeam: (teamId: string) => Promise<void>;
 
   // Attendance CRUD
-  markAttendance: (groupId: string, date: string, records: Record<string, boolean>) => Promise<void>;
+  markAttendance: (
+    groupId: string,
+    date: string,
+    records: Record<string, boolean | "present" | "absent" | "justified">,
+    notes?: Record<string, string>,
+    dayObservation?: string
+  ) => Promise<void>;
 
   // Grade CRUD
   saveGrade: (studentId: string, categoryId: string, activityName: string, score: number, activityId?: string, delivered?: boolean, deliveredWorks?: number) => Promise<void>;
@@ -1190,10 +1196,17 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   },
 
   // ATTENDANCE CRUD
-  markAttendance: async (groupId, date, records) => {
+  markAttendance: async (groupId, date, records, notes, dayObservation) => {
     const existing = get().attendances.find((a) => a.groupId === groupId && a.date === date);
     const attendanceId = existing ? existing.id : generateUUID();
-    const attendanceObj: Attendance = { id: attendanceId, groupId, date, records };
+    const attendanceObj: Attendance = {
+      id: attendanceId,
+      groupId,
+      date,
+      records,
+      notes: notes !== undefined ? notes : (existing?.notes || {}),
+      dayObservation: dayObservation !== undefined ? dayObservation : (existing?.dayObservation || "")
+    };
 
     set((state) => {
       const exists = state.attendances.some((a) => a.id === attendanceId || (a.groupId === groupId && a.date === date));
