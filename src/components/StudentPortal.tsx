@@ -6,7 +6,8 @@
 import React, { useState } from "react";
 import { useDocenteStore } from "../store/docenteStore";
 import { calculateStudentGrades } from "./GradesTable";
-import { LogIn, LogOut, GraduationCap, Key, FileText, User, RefreshCw, Calendar, CheckCircle2, XCircle, LayoutDashboard, ClipboardList, Check, Minus, X } from "lucide-react";
+import { isLocalStorageFallback } from "../lib/firebase";
+import { LogIn, LogOut, GraduationCap, Key, FileText, User, RefreshCw, Calendar, CheckCircle2, XCircle, LayoutDashboard, ClipboardList, Check, Minus, X, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 export default function StudentPortal() {
   const activeStudent = useDocenteStore((state) => state.activeStudent);
@@ -22,6 +23,7 @@ export default function StudentPortal() {
   // Form input states
   const [matricula, setMatricula] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  const [showCode, setShowCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export default function StudentPortal() {
     setError(null);
 
     const mat = matricula.trim();
-    const code = accessCode.trim();
+    const code = accessCode.trim().toUpperCase().replace(/\s+/g, "");
 
     if (!mat || !code) {
       setError("Ambos campos son requeridos.");
@@ -67,13 +69,22 @@ export default function StudentPortal() {
             </div>
             <h2 className="text-xl font-extrabold text-slate-800">Portal de Consulta Alumnos</h2>
             <p className="text-sm text-slate-400 mt-1">
-              Ingresa tus credenciales únicas para ver tus calificaciones y estatus en tiempo real.
+              Ingresa tus credenciales para ver tus calificaciones y asistencias en tiempo real.
             </p>
           </div>
 
+          {isLocalStorageFallback && (
+            <div className="mb-5 flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-3 text-[11px] leading-relaxed">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <span className="font-bold">Modo Local (Sin Firebase):</span> Los alumnos solo pueden iniciar sesión en este mismo navegador/dispositivo donde el profesor dio de alta los datos.
+              </div>
+            </div>
+          )}
+
           {error && (
-            <div id="portal-login-error" className="flex items-center gap-2.5 bg-red-50 text-red-700 border border-red-100 rounded-xl p-3.5 text-xs mb-6">
-              <XCircle className="w-4 h-4 shrink-0" />
+            <div id="portal-login-error" className="flex items-start gap-2.5 bg-red-50 text-red-700 border border-red-100 rounded-xl p-3.5 text-xs mb-6 leading-relaxed">
+              <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -91,7 +102,7 @@ export default function StudentPortal() {
                   id="student-matricula"
                   type="text"
                   value={matricula}
-                  onChange={(e) => setMatricula(e.target.value)}
+                  onChange={(e) => setMatricula(e.target.value.trimStart())}
                   placeholder="Ej: 23001"
                   className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition"
                   required
@@ -109,14 +120,22 @@ export default function StudentPortal() {
                 </div>
                 <input
                   id="student-access-code"
-                  type="password"
+                  type={showCode ? "text" : "password"}
                   autoComplete="current-password"
                   value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  placeholder="Ej: A7K9P4X2"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition font-mono uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal"
+                  onChange={(e) => setAccessCode(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                  placeholder="Ej: AB12"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition font-mono tracking-widest placeholder:normal-case placeholder:tracking-normal uppercase"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowCode(!showCode)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
+                  title={showCode ? "Ocultar código" : "Mostrar código"}
+                >
+                  {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 

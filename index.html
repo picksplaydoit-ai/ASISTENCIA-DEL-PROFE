@@ -2,12 +2,40 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Seguimiento PrepMaster</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>Seguimiento PrepMaster - Control de Asistencia y Calificaciones</title>
+    <meta name="description" content="Sistema de control de asistencia escolar, registro de faltas, rúbricas de evaluación y consulta en tiempo real." />
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="color-scheme" content="light" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Asistencia Profe" />
+    <meta name="application-name" content="Asistencia Profe" />
+    <meta name="format-detection" content="telephone=no" />
   </head>
-  <body>
+  <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register Service Worker for PWA
+      if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('PrepMaster Service Worker registrado correctamente:', registration.scope);
+            })
+            .catch((error) => {
+              console.log('Error al registrar Service Worker:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
-

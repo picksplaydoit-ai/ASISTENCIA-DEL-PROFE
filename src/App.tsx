@@ -21,7 +21,9 @@ import {
   Info,
   Database,
   ArrowLeft,
+  Smartphone,
 } from "lucide-react";
+import InstallAppModal from "./components/InstallAppModal";
 
 export default function App() {
   const currentView = useDocenteStore((state) => state.currentView);
@@ -58,6 +60,7 @@ export default function App() {
   const [groupName, setGroupName] = useState("");
   const [groupYear, setGroupYear] = useState("");
   const [groupFormError, setGroupFormError] = useState<string | null>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
 
   // URL route handling
   useEffect(() => {
@@ -153,8 +156,19 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* PWA Mobile Install Button */}
+            <button
+              id="nav-btn-install-pwa"
+              onClick={() => setShowInstallModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition border border-indigo-200/70 shadow-2xs active:scale-95"
+              title="Instalar en tu celular o pantalla de inicio"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="hidden xs:inline sm:inline">Instalar App</span>
+            </button>
+
             {/* Database indicator */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-full text-[10px] font-semibold text-slate-500">
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-full text-[10px] font-semibold text-slate-500">
               <Database className="w-3 h-3 text-indigo-500" />
               <span>Base: {isFirebaseMode ? "Firestore Live" : "Local (Desarrollo)"}</span>
             </div>
@@ -293,10 +307,19 @@ export default function App() {
               </div>
             </div>
 
-            {/* Quick URL notice */}
-            <div className="text-center text-xs text-slate-400 max-w-sm mx-auto bg-slate-50 border border-slate-100 rounded-xl p-3 flex items-center gap-2">
-              <Info className="w-4 h-4 text-indigo-400 shrink-0" />
-              <span>Los alumnos pueden ingresar directamente agregando <strong className="text-slate-600">/portal</strong> al final de la URL del sitio.</span>
+            {/* Quick URL notice & PWA Install Banner */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-xl mx-auto">
+              <div className="text-center sm:text-left text-xs text-slate-500 bg-white border border-slate-200/80 rounded-xl p-3 flex-1 flex items-center gap-2 shadow-2xs">
+                <Info className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>Alumnos: ingresen directamente con <strong className="text-indigo-600">/portal</strong> al final de la URL.</span>
+              </div>
+              <button
+                onClick={() => setShowInstallModal(true)}
+                className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95 flex items-center justify-center gap-2 shrink-0"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span>Instalar en Celular</span>
+              </button>
             </div>
           </div>
         )}
@@ -650,12 +673,22 @@ export default function App() {
           <div>
             <span>© 2026 <strong>Seguimiento PrepMaster</strong>. Diseñado para educadores.</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowInstallModal(true)} 
+              className="text-indigo-600 hover:text-indigo-800 font-bold transition flex items-center gap-1"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Instalar en Celular</span>
+            </button>
             <button id="footer-btn-profes" onClick={() => setView("teacher-login")} className="hover:text-indigo-600 font-semibold transition">Docentes</button>
             <button id="footer-btn-alumnos" onClick={() => setView("student-portal")} className="hover:text-indigo-600 font-semibold transition">Alumnos</button>
           </div>
         </div>
       </footer>
+
+      {/* PWA Install Modal */}
+      <InstallAppModal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} />
     </div>
   );
 }

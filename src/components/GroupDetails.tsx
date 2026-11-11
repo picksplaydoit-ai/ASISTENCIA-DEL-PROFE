@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import * as XLSX from "xlsx";
 import { useDocenteStore } from "../store/docenteStore";
 import StudentImporter from "./StudentImporter";
 import CategoryManager from "./CategoryManager";
@@ -121,6 +122,40 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
     } catch (err) {
       setGroupError("Error al registrar el alumno.");
     }
+  };
+
+  const handleExportCredentialsExcel = () => {
+    if (students.length === 0) return;
+    const wb = XLSX.utils.book_new();
+    const sheetData = students.map((s) => ({
+      "Nombre Completo": s.name,
+      "Matrícula": s.matricula,
+      "Código de Acceso": s.accessCode,
+    }));
+    const ws = XLSX.utils.json_to_sheet(sheetData);
+    ws["!cols"] = [{ wch: 35 }, { wch: 16 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Accesos");
+    const safeGroupName = (group?.name || "Grupo").replace(/[\\/:*?"<>|]/g, "_");
+    XLSX.writeFile(wb, `Accesos_${safeGroupName}.xlsx`);
+  };
+
+  const handleExportCredentials = () => {
+    if (students.length === 0) return;
+    const headers = ["Nombre", "Matrícula", "Código de Acceso"];
+    const rows = students.map((s) => [
+      `"${s.name.replace(/"/g, '""')}"`,
+      `"${s.matricula}"`,
+      `"${s.accessCode}"`,
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Credenciales_${group?.name || "Grupo"}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const totalPercentage = categories.reduce((sum, c) => sum + c.percentage, 0);
@@ -256,12 +291,12 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
       </div>
 
       {/* Secondary Level Tab Bar */}
-      <div className="flex flex-wrap border-b border-slate-100 bg-white rounded-xl p-1 shadow-sm gap-1">
+      <div className="flex overflow-x-auto border-b border-slate-100 bg-white rounded-xl p-1 shadow-sm gap-1">
         <button
           id="subtab-students"
           onClick={() => setActiveTab("students")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "students" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "students" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Users className="w-4 h-4" />
@@ -270,8 +305,8 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
         <button
           id="subtab-attendance"
           onClick={() => setActiveTab("attendance")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "attendance" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "attendance" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <CalendarCheck className="w-4 h-4" />
@@ -280,8 +315,8 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
         <button
           id="subtab-teams"
           onClick={() => setActiveTab("teams")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "teams" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "teams" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <GroupIcon className="w-4 h-4" />
@@ -290,8 +325,8 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
         <button
           id="subtab-categories"
           onClick={() => setActiveTab("categories")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "categories" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "categories" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <Percent className="w-4 h-4" />
@@ -300,8 +335,8 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
         <button
           id="subtab-activities"
           onClick={() => setActiveTab("activities")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "activities" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "activities" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <ClipboardList className="w-4 h-4" />
@@ -310,8 +345,8 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
         <button
           id="subtab-grades"
           onClick={() => setActiveTab("grades")}
-          className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
-            activeTab === "grades" ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-800"
+          className={`flex-1 min-w-[105px] shrink-0 sm:shrink flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold rounded-lg transition ${
+            activeTab === "grades" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
           }`}
         >
           <FileSpreadsheet className="w-4 h-4" />
@@ -344,6 +379,23 @@ export default function GroupDetails({ groupId, onBack }: GroupDetailsProps) {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Eliminar Todos
+                  </button>
+                  <button
+                    onClick={handleExportCredentialsExcel}
+                    disabled={students.length === 0}
+                    className="flex items-center justify-center gap-1 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 text-xs font-bold rounded-lg transition shadow-sm"
+                    title="Descargar archivo Excel (.xlsx) con nombres, matrículas y códigos"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Descargar Accesos (.xlsx)
+                  </button>
+                  <button
+                    onClick={handleExportCredentials}
+                    disabled={students.length === 0}
+                    className="flex items-center justify-center gap-1 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 disabled:opacity-50 text-xs font-bold rounded-lg transition shadow-sm"
+                    title="Descargar archivo CSV con las matrículas y códigos de acceso"
+                  >
+                    CSV
                   </button>
                   <button
                     id="btn-toggle-add-student"

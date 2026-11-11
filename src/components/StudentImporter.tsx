@@ -6,8 +6,9 @@
 import React, { useState, useRef } from "react";
 import { useDocenteStore } from "../store/docenteStore";
 import { Student } from "../types";
-import { Upload, Clipboard, Download, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Upload, Clipboard, Download, CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 interface StudentImporterProps {
   groupId: string;
@@ -25,78 +26,94 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const processRows = (data: (string | number)[][]) => {
+    if (!data || data.length === 0) {
+      setError("El archivo o texto está vacío.");
+      return;
+    }
+
+    const stringData = data.map((row) =>
+      row ? row.map((cell) => (cell !== null && cell !== undefined ? String(cell).trim() : "")) : []
+    );
+
+    const parsed: { name: string; matricula: string }[] = [];
+    const firstRow = stringData[0].map((h) => h.toLowerCase());
+
+    // Helper to check if row looks like a header
+    const isHeaderRow = firstRow.some(
+      (h) =>
+        h.includes("alumno") ||
+        h.includes("nombre") ||
+        h.includes("matricula") ||
+        h.includes("matrícula") ||
+        h.includes("name") ||
+        h.includes("id")
+    );
+
+    let nameIndex = -1;
+    let matriculaIndex = -1;
+    let startIndex = 0;
+
+    if (isHeaderRow) {
+      startIndex = 1;
+      nameIndex = firstRow.findIndex(
+        (h) => /nombre|^name$|estudiante|alumno/i.test(h) && !/yomi|family|given|additional/i.test(h)
+      );
+      if (nameIndex === -1) {
+        nameIndex = firstRow.findIndex((h) => /nombre|name/i.test(h));
+      }
+      matriculaIndex = firstRow.findIndex((h) => /matr[ií]cula|c[oó]digo|id|^notes$/i.test(h));
+
+      if (nameIndex === -1) nameIndex = 0;
+      if (matriculaIndex === -1) matriculaIndex = 1;
+    } else {
+      nameIndex = 0;
+      matriculaIndex = 1;
+    }
+
+    for (let i = startIndex; i < stringData.length; i++) {
+      const row = stringData[i];
+      if (!row || row.length === 0) continue;
+
+      const name = row[nameIndex]?.trim();
+      let matricula = row[matriculaIndex]?.trim();
+
+      // Fallback: if matricula is empty or not found, look for 4-15 digit number or alphanumeric code in other cells
+      if (!matricula || !/^[0-9A-Za-z_-]{4,15}$/.test(matricula)) {
+        for (let j = 0; j < row.length; j++) {
+          if (j !== nameIndex && row[j] && /^[0-9]{5,15}$/.test(row[j].trim())) {
+            matricula = row[j].trim();
+            break;
+          }
+        }
+      }
+
+      if (name) {
+        if (!matricula) {
+          matricula = "TEMP_" + Math.floor(1000 + Math.random() * 9000);
+        }
+        parsed.push({ name, matricula });
+      }
+    }
+
+    if (parsed.length === 0) {
+      setError("No se encontraron datos válidos de alumnos (requiere al menos nombres).");
+    } else {
+      setPreviewList(parsed);
+    }
+  };
+
   const parseRawText = (text: string) => {
     setError(null);
     Papa.parse(text, {
       skipEmptyLines: true,
       complete: (results) => {
-        const data = results.data as string[][];
-        if (data.length === 0) {
-          setError("El archivo o texto está vacío.");
-          return;
-        }
-
-        const parsed: { name: string; matricula: string }[] = [];
-        const firstRow = data[0].map(h => h.trim().toLowerCase());
-
-        // Helper to check if row looks like a header
-        const isHeaderRow = firstRow.some(h => 
-          h.includes("alumno") || h.includes("nombre") || h.includes("matricula") || 
-          h.includes("matrícula") || h.includes("name") || h.includes("id")
-        );
-
-        let nameIndex = -1;
-        let matriculaIndex = -1;
-        let startIndex = 0;
-
-        if (isHeaderRow) {
-          startIndex = 1;
-          nameIndex = firstRow.findIndex(h => /nombre|^name$|estudiante|alumno/i.test(h) && !/yomi|family|given|additional/i.test(h));
-          if (nameIndex === -1) {
-            nameIndex = firstRow.findIndex(h => /nombre|name/i.test(h));
-          }
-          matriculaIndex = firstRow.findIndex(h => /matr[ií]cula|c[oó]digo|id|^notes$/i.test(h));
-          
-          if (nameIndex === -1) nameIndex = 0;
-          if (matriculaIndex === -1) matriculaIndex = 1;
-        } else {
-          nameIndex = 0;
-          matriculaIndex = 1;
-        }
-
-        for (let i = startIndex; i < data.length; i++) {
-          const row = data[i];
-          const name = row[nameIndex]?.trim();
-          let matricula = row[matriculaIndex]?.trim();
-
-          // Fallback: if matricula is empty or we didn't find a good column, look for the first 7-15 digit number
-          if (!matricula || !/^[0-9]+$/.test(matricula)) {
-            for (let j = 1; j < row.length; j++) {
-              if (row[j] && /^[0-9]{7,15}$/.test(row[j].trim())) {
-                matricula = row[j].trim();
-                break;
-              }
-            }
-          }
-
-          if (name) {
-            if (!matricula) {
-              matricula = "TEMP_" + Math.floor(1000 + Math.random() * 9000);
-            }
-            parsed.push({ name, matricula });
-          }
-        }
-
-        if (parsed.length === 0) {
-          setError("No se encontraron datos válidos.");
-        } else {
-          setPreviewList(parsed);
-        }
+        processRows(results.data as string[][]);
       },
       error: (err) => {
         console.error("PapaParse error:", err);
-        setError("Ocurrió un error al procesar el archivo CSV.");
-      }
+        setError("Ocurrió un error al procesar el texto o archivo CSV.");
+      },
     });
   };
 
@@ -126,7 +143,31 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
     }
   };
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
+    setError(null);
+    const fileName = file.name.toLowerCase();
+
+    // Check if it's an Excel spreadsheet (.xlsx, .xls)
+    if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+      try {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          setError("El archivo Excel no contiene hojas de cálculo.");
+          return;
+        }
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as (string | number)[][];
+        processRows(rows);
+      } catch (excelErr) {
+        console.error("Error al leer archivo Excel:", excelErr);
+        setError("No se pudo leer el archivo Excel. Asegúrate de que no esté protegido con contraseña.");
+      }
+      return;
+    }
+
+    // Otherwise treat as CSV / TXT text
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -171,8 +212,24 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
     }
   };
 
-  // Export to Excel-compatible CSV with Spanish accents support
-  const exportAccessCodesCSV = () => {
+    // Export directly as true Excel workbook (.xlsx)
+    const exportAccessCodesExcel = () => {
+      if (importedStudents.length === 0) return;
+
+      const wb = XLSX.utils.book_new();
+      const sheetData = importedStudents.map((s) => ({
+        "Matrícula": s.matricula,
+        "Alumno": s.name,
+        "Código de Acceso": s.accessCode,
+      }));
+      const ws = XLSX.utils.json_to_sheet(sheetData);
+      ws["!cols"] = [{ wch: 16 }, { wch: 35 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Accesos");
+      XLSX.writeFile(wb, "Credenciales_Alumnos_Grupo.xlsx");
+    };
+
+    // Export to Excel-compatible CSV with Spanish accents support
+    const exportAccessCodesCSV = () => {
     if (importedStudents.length === 0) return;
 
     const headers = ["Alumno", "Matricula", "CodigoAcceso"];
@@ -250,15 +307,15 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
               id="file-input"
               ref={fileInputRef}
               type="file"
-              accept=".csv,.txt"
+              accept=".xlsx,.xls,.csv,.txt"
               onChange={handleFileChange}
               className="hidden"
             />
-            <div className="p-3 bg-slate-50 text-slate-500 rounded-full mb-4">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-full mb-4">
               <Upload className="w-6 h-6" />
             </div>
             <p className="text-sm font-medium text-slate-700 mb-1">Arrastra tu archivo aquí</p>
-            <p className="text-xs text-slate-400 mb-3">Soporta archivos CSV o de texto separado por comas</p>
+            <p className="text-xs text-slate-400 mb-3">Soporta archivos Excel (.xlsx, .xls) o CSV</p>
             <button
               id="btn-select-file"
               type="button"
@@ -268,7 +325,7 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
                 triggerFileInput();
               }}
             >
-              Seleccionar Archivo
+              Seleccionar Archivo (Excel o CSV)
             </button>
           </div>
 
@@ -359,14 +416,25 @@ export default function StudentImporter({ groupId, onImportComplete }: StudentIm
                 <p className="text-xs text-emerald-600">Se han registrado {importedStudents.length} alumnos con códigos de acceso creados.</p>
               </div>
             </div>
-            <button
-              id="btn-export-excel"
-              onClick={exportAccessCodesCSV}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0"
-            >
-              <Download className="w-4 h-4" />
-              Exportar Códigos a Excel
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                id="btn-export-excel"
+                onClick={exportAccessCodesExcel}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition shrink-0"
+                title="Descargar en formato Excel nativo (.xlsx)"
+              >
+                <Download className="w-4 h-4" />
+                Descargar en Excel (.xlsx)
+              </button>
+              <button
+                id="btn-export-csv"
+                onClick={exportAccessCodesCSV}
+                className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-medium rounded-lg shadow-xs transition shrink-0"
+                title="Descargar en formato CSV"
+              >
+                Descargar CSV
+              </button>
+            </div>
           </div>
 
           <div className="border border-slate-200/60 rounded-lg overflow-hidden max-h-60 overflow-y-auto bg-white mb-4">

@@ -55,6 +55,10 @@ export default function ActivitiesManager({ groupId }: { groupId: string }) {
   };
 
   const openCreateModal = () => {
+    if (categories.length === 0) {
+      alert("Debes crear al menos una categoría de evaluación en la pestaña 'Rúbrica' (por ejemplo: Tareas, Exámenes, Proyectos) antes de registrar actividades.");
+      return;
+    }
     setName("");
     setCategoryId(categories[0]?.id || "");
     setType("numeric");

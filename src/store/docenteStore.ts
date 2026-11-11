@@ -1230,29 +1230,40 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
   // STUDENT PORTAL ACTIONS
   accessStudentPortal: async (matricula, accessCode) => {
     const trimmedMatricula = matricula.trim();
-    const trimmedCode = accessCode.trim();
+    const trimmedCode = accessCode.trim().toUpperCase().replace(/\s+/g, "");
+
+    if (!trimmedMatricula || !trimmedCode) {
+      return { success: false, error: "Por favor ingresa tanto tu matrícula como tu código de acceso." };
+    }
 
     if (!isLocalStorageFallback && db) {
       try {
-        // Query student where matricula == trimmedMatricula
+        // Query student where matricula == trimmedMatricula (trying exact, uppercase, and lowercase for tolerance)
         const studentsRef = collection(db, "students");
-        const q = query(studentsRef, where("matricula", "==", trimmedMatricula));
-        const querySnapshot = await getDocs(q);
+        let querySnapshot = await getDocs(query(studentsRef, where("matricula", "==", trimmedMatricula)));
+
+        if (querySnapshot.empty && trimmedMatricula.toUpperCase() !== trimmedMatricula) {
+          querySnapshot = await getDocs(query(studentsRef, where("matricula", "==", trimmedMatricula.toUpperCase())));
+        }
+        if (querySnapshot.empty && trimmedMatricula.toLowerCase() !== trimmedMatricula) {
+          querySnapshot = await getDocs(query(studentsRef, where("matricula", "==", trimmedMatricula.toLowerCase())));
+        }
 
         if (querySnapshot.empty) {
-          return { success: false, error: "Matrícula o código de acceso incorrectos." };
+          return { success: false, error: "Matrícula no encontrada. Verifica que esté escrita correctamente." };
         }
 
         let matchedStudent: Student | null = null;
         querySnapshot.forEach((doc) => {
           const data = doc.data() as Student;
-          if (data.accessCode === trimmedCode) {
+          const stuCode = (data.accessCode || "").trim().toUpperCase().replace(/\s+/g, "");
+          if (stuCode === trimmedCode) {
             matchedStudent = { id: doc.id, ...data };
           }
         });
 
         if (!matchedStudent) {
-          return { success: false, error: "Matrícula o código de acceso incorrectos." };
+          return { success: false, error: "Código de acceso incorrecto. Verifica mayúsculas y números con tu profesor." };
         }
 
         // Student matches! Load group info
@@ -1270,9 +1281,18 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         get().subscribeToStudentData(student.id, student.groupId);
 
         return { success: true };
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error in student login:", err);
-        return { success: false, error: "Ocurrió un error al intentar ingresar al portal." };
+        if (err?.code === "permission-denied" || err?.message?.includes("permission") || err?.message?.includes("insufficient")) {
+          return {
+            success: false,
+            error: "Error de permisos en la base de datos (Firestore). El administrador debe permitir lectura pública en las reglas de Firestore.",
+          };
+        }
+        return {
+          success: false,
+          error: "Ocurrió un error al intentar ingresar al portal: " + (err?.message || "problema de conexión con el servidor."),
+        };
       }
     } else {
       // Local fallback lookup
@@ -1296,18 +1316,34 @@ export const useDocenteStore = create<DocenteState>((set, get) => ({
         }
       }
 
-      // Find matched student
-      const matchedStudent = allLocalStudents.find(
-        (s) => s.matricula === trimmedMatricula && s.accessCode === trimmedCode
-      );
+      if (allLocalStudents.length === 0) {
+        return {
+          success: false,
+          error: "No se encontraron alumnos en la base de datos de este dispositivo. Si el profesor creó a los alumnos en otra computadora o teléfono, es indispensable configurar Firebase para que los datos se sincronicen en la nube.",
+        };
+      }
+
+      // Find matched student case-insensitively
+      const matchedStudent = allLocalStudents.find((s) => {
+        const stuMat = (s.matricula || "").trim().toUpperCase();
+        const stuCode = (s.accessCode || "").trim().toUpperCase().replace(/\s+/g, "");
+        return stuMat === trimmedMatricula.toUpperCase() && stuCode === trimmedCode;
+      });
 
       if (!matchedStudent) {
-        return { success: false, error: "Matrícula o código de acceso incorrectos." };
+        // Check if at least matricula matches to give a more helpful message
+        const matriculaExists = allLocalStudents.some(
+          (s) => (s.matricula || "").trim().toUpperCase() === trimmedMatricula.toUpperCase()
+        );
+        if (matriculaExists) {
+          return { success: false, error: "Código de acceso incorrecto. Verifica el código proporcionado por tu profesor." };
+        }
+        return { success: false, error: "Matrícula no encontrada en el sistema." };
       }
 
       const matchedGroup = allLocalGroups.find((g) => g.id === matchedStudent.groupId) || null;
 
-        // Also grab teacherId to get categories, grades, activities, and attendances
+      // Also grab teacherId to get categories, grades, activities, and attendances
       let studentCats: Category[] = [];
       let studentGrades: Grade[] = [];
       let studentActivities: Activity[] = [];

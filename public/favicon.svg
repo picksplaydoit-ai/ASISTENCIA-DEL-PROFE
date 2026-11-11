@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="favBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4338ca" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#favBg)" />
+  <!-- Graduation cap -->
+  <path d="M32 12 L54 23 L32 34 L10 23 Z" fill="#ffffff" />
+  <path d="M18 28 L18 42 C18 48, 46 48, 46 42 L46 28 L32 35 Z" fill="#e0e7ff" />
+  <!-- Mini badge -->
+  <circle cx="48" cy="48" r="12" fill="#10b981" stroke="#ffffff" stroke-width="2.5" />
+  <path d="M43 48 L46 51 L53 44" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
+
